@@ -21,9 +21,9 @@ let fieldMapping = {
 
 // 默认字段名列表（支持多个可选字段名）
 const DEFAULT_FIELD_NAMES = {
-  level1: ["功能", "L1", "level1", "一级"],
-  level2: ["类型", "L2", "level2", "二级"],
-  level3: ["子功能", "L3", "level3", "三级"],
+  level1: ["功能", "L1", "level1", "一级", "一级模块"],
+  level2: ["类型", "L2", "level2", "二级", "二级模块"],
+  level3: ["子功能", "L3", "level3", "三级", "三级模块", "用例类型"],
   level4: ["标题", "用例名称", "L4", "level4", "四级"],
   number: ["编号", "ID", "Number", "number"],
 };
@@ -102,6 +102,8 @@ function switchSheet() {
 
     if (jsonData.length < 2) {
       console.warn("工作表数据不足");
+      // 清空脑图显示
+      clearMindmap();
       return;
     }
 
@@ -119,8 +121,9 @@ function switchSheet() {
       console.log("已自动匹配字段并生成脑图");
       parseExcelData(jsonData);
     } else {
-      // 如果未能匹配必需字段，提示用户手动配置
+      // 如果未能匹配必需字段，清空之前的脑图并提示用户手动配置
       console.log("未能自动匹配所有必需字段，请手动配置");
+      clearMindmapCanvas();
     }
   } catch (error) {
     console.error("解析工作表失败:", error);
@@ -398,6 +401,11 @@ function renderMindmap() {
   nodes = [];
   svg.innerHTML = "";
   canvas.innerHTML = '<svg class="connections" id="connections"></svg>';
+
+  // 重置视图参数
+  scale = 0.7;
+  panX = 0;
+  panY = 0;
 
   // 隐藏空状态
   emptyState.style.display = "none";
@@ -851,6 +859,46 @@ function clearMindmap() {
   if (sheetSelect) {
     sheetSelect.innerHTML = "";
   }
+
+  // 禁用控制按钮
+  document.getElementById("resetBtn").disabled = true;
+  document.getElementById("expandBtn").disabled = true;
+  document.getElementById("collapseBtn").disabled = true;
+  document.getElementById("autoLayoutBtn").disabled = true;
+  document.getElementById("fitBtn").disabled = true;
+  document.getElementById("copyBtn").disabled = true;
+  document.getElementById("downloadBtn").disabled = true;
+}
+
+// 清空脑图画布（保留文件和 workbook）
+function clearMindmapCanvas() {
+  // 清空脑图数据
+  nodes = [];
+  testData = [];
+  mindmapData = null;
+  nodeExpanded = {};
+
+  // 重置视图
+  scale = 0.7;
+  panX = 0;
+  panY = 0;
+
+  // 清空画布内容
+  canvas.innerHTML = '<svg class="connections" id="connections"></svg>';
+  svg.innerHTML = "";
+  svg.style.display = "none";
+
+  // 显示空状态
+  emptyState.style.display = "flex";
+
+  // 禁用控制按钮
+  document.getElementById("resetBtn").disabled = true;
+  document.getElementById("expandBtn").disabled = true;
+  document.getElementById("collapseBtn").disabled = true;
+  document.getElementById("autoLayoutBtn").disabled = true;
+  document.getElementById("fitBtn").disabled = true;
+  document.getElementById("copyBtn").disabled = true;
+  document.getElementById("downloadBtn").disabled = true;
 }
 
 // 重置布局

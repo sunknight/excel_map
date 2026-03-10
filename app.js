@@ -35,6 +35,36 @@ const canvas = document.getElementById("canvas");
 const svg = document.getElementById("connections");
 const emptyState = document.getElementById("emptyState");
 
+// HTML 转义函数 - 防止 XSS 攻击
+function escapeHtml(unsafe) {
+  if (typeof unsafe !== "string") {
+    // 如果不是字符串，转换为字符串后再转义
+    unsafe = String(unsafe);
+  }
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// 属性值转义函数
+function escapeAttr(unsafe) {
+  if (typeof unsafe !== "string") {
+    unsafe = String(unsafe);
+  }
+  return escapeHtml(unsafe).replace(/"/g, "&quot;");
+}
+
+// 验证并转义文本内容
+function sanitizeText(text) {
+  if (text === null || text === undefined) {
+    return "";
+  }
+  return escapeHtml(String(text));
+}
+
 // Toast 提示函数
 function showToast(message, type = "info") {
   const container = document.getElementById("toast-container");
@@ -47,7 +77,15 @@ function showToast(message, type = "info") {
     info: "ℹ",
   };
 
-  toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span>${message}</span>`;
+  const iconSpan = document.createElement("span");
+  iconSpan.className = "toast-icon";
+  iconSpan.textContent = icons[type] || icons.info;
+
+  const messageSpan = document.createElement("span");
+  messageSpan.textContent = message; // 使用 textContent 而不是 innerHTML
+
+  toast.appendChild(iconSpan);
+  toast.appendChild(messageSpan);
   container.appendChild(toast);
 
   // 触发动画
@@ -677,7 +715,11 @@ function renderNodes() {
       displayText = `${node.name} (${testCaseCount})`;
     }
 
-    nodeElement.innerHTML = `<div class="node-text">${indicator}${displayText}</div>`;
+    // 创建节点文本元素 - 使用 textContent 防止 XSS
+    const nodeText = document.createElement("div");
+    nodeText.className = "node-text";
+    nodeText.textContent = indicator + displayText;
+    nodeElement.appendChild(nodeText);
 
     // 设置位置
     nodeElement.style.left = `${node.x}px`;
@@ -806,8 +848,11 @@ function showTestCaseDetail(testCase) {
   const modalTitle = document.getElementById("modal-title");
   const modalContent = document.getElementById("modal-content");
 
-  // 使用用例名称作为标题
-  modalTitle.textContent = testCase._level4 || "测试用例详情";
+  // 使用用例名称作为标题 - 使用 textContent 防止 XSS
+  modalTitle.textContent = sanitizeText(testCase._level4 || "测试用例详情");
+
+  // 清空内容
+  modalContent.innerHTML = "";
 
   // 获取所有字段（排除内部字段）
   const displayFields = Object.keys(testCase).filter(
@@ -817,21 +862,32 @@ function showTestCaseDetail(testCase) {
       testCase[key] !== "",
   );
 
-  // 构建内容
-  let content =
-    '<div style="display: grid; grid-template-columns: 120px 1fr; gap: 12px 20px; font-size: 13px;">';
+  // 创建内容容器
+  const contentDiv = document.createElement("div");
+  contentDiv.style.cssText =
+    "display: grid; grid-template-columns: 120px 1fr; gap: 12px 20px; font-size: 13px;";
 
   displayFields.forEach((key) => {
     const value = testCase[key];
-    const displayValue = value || "未设置";
+    const displayValue = sanitizeText(value || "未设置");
+
+    // 创建标签行
+    const labelDiv = document.createElement("div");
+    labelDiv.style.cssText =
+      "font-weight: 600; color: #262626; text-align: right; padding-top: 4px;";
+    labelDiv.textContent = sanitizeText(key);
+    contentDiv.appendChild(labelDiv);
+
+    // 创建值行
+    const valueDiv = document.createElement("div");
+    valueDiv.style.cssText = "color: #595959; line-height: 1.6;";
 
     // 特殊处理优先级字段
     if (key === "优先级") {
-      const priorityClass = value ? `priority-${value}` : "";
-      content += `
-                <div style="font-weight: 600; color: #262626; text-align: right; padding-top: 4px;">${key}</div>
-                <div style="color: #595959; line-height: 1.6;"><span class="priority-tag ${priorityClass}">${displayValue}</span></div>
-            `;
+      const priorityTag = document.createElement("span");
+      priorityTag.className = value ? `priority-tag priority-${value}` : "";
+      priorityTag.textContent = displayValue;
+      valueDiv.appendChild(priorityTag);
     } else {
       // 判断是否需要保留换行
       const needsPreWrap = [
@@ -841,20 +897,19 @@ function showTestCaseDetail(testCase) {
         "预期结果",
         "备注",
       ].includes(key);
-      const style = needsPreWrap
-        ? "white-space: pre-wrap; word-break: break-word;"
-        : "";
 
-      content += `
-                <div style="font-weight: 600; color: #262626; text-align: right; padding-top: 4px;">${key}</div>
-                <div style="color: #595959; line-height: 1.6; ${style}">${displayValue}</div>
-            `;
+      if (needsPreWrap) {
+        valueDiv.style.whiteSpace = "pre-wrap";
+        valueDiv.style.wordBreak = "break-word";
+      }
+
+      valueDiv.textContent = displayValue;
     }
+
+    contentDiv.appendChild(valueDiv);
   });
 
-  content += "</div>";
-
-  modalContent.innerHTML = content;
+  modalContent.appendChild(contentDiv);
   modal.style.display = "flex";
 }
 

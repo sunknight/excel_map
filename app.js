@@ -1021,23 +1021,25 @@ function toggleNode(nodeId) {
   // 重新布局，但不更新画布变换
   autoLayout(true);
 
-  // 使用 requestAnimationFrame 确保 DOM 完全渲染后再获取新位置
+  // 使用双重 requestAnimationFrame 确保 DOM 完全渲染后再获取新位置
   requestAnimationFrame(() => {
-    const newElement = document.getElementById(`node-${nodeId}`);
-    const newRect = newElement.getBoundingClientRect();
-    const newCenterX = newRect.left + newRect.width / 2;
-    const newCenterY = newRect.top + newRect.height / 2;
+    requestAnimationFrame(() => {
+      const newElement = document.getElementById(`node-${nodeId}`);
+      const newRect = newElement.getBoundingClientRect();
+      const newCenterX = newRect.left + newRect.width / 2;
+      const newCenterY = newRect.top + newRect.height / 2;
 
-    // 计算节点在屏幕上移动的距离
-    const deltaX = newCenterX - oldCenterX;
-    const deltaY = newCenterY - oldCenterY;
+      // 计算节点在屏幕上移动的距离
+      const deltaX = newCenterX - oldCenterX;
+      const deltaY = newCenterY - oldCenterY;
 
-    // 调整 panX 和 panY 来补偿移动
-    panX -= deltaX;
-    panY -= deltaY;
+      // 调整 panX 和 panY 来补偿移动
+      panX -= deltaX;
+      panY -= deltaY;
 
-    // 更新画布变换
-    updateCanvasTransform();
+      // 更新画布变换
+      updateCanvasTransform();
+    });
   });
 }
 

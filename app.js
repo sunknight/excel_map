@@ -1164,6 +1164,9 @@ document.addEventListener("mouseup", () => {
 });
 
 // 鼠标滚轮/触摸板 - 支持平移和缩放
+let lastZoomTime = 0;
+const ZOOM_THROTTLE = 8; // 约 120fps，更灵敏的响应
+
 viewport.addEventListener(
   "wheel",
   (e) => {
@@ -1171,9 +1174,19 @@ viewport.addEventListener(
 
     // 检测是否是触控板缩放手势（ctrlKey 为 true 表示缩放）
     if (e.ctrlKey || e.metaKey) {
-      // 触控板两指缩放
+      // 节流：限制缩放频率，使动画更平滑
+      const now = Date.now();
+      if (now - lastZoomTime < ZOOM_THROTTLE) {
+        return;
+      }
+      lastZoomTime = now;
+
+      // 触控板两指缩放 - 使用更小的缩放步长
       // deltaY > 0 表示缩小，deltaY < 0 表示放大
-      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+      // 使用对数缩放，使缩放更平滑
+      const delta = Math.abs(e.deltaY);
+      const zoomStep = Math.min(delta / 150, 0.2); // 最大每步 20%
+      const zoomFactor = e.deltaY > 0 ? 1 - zoomStep : 1 + zoomStep;
 
       // 计算鼠标位置相对于画布的坐标
       const rect = viewport.getBoundingClientRect();
@@ -1190,17 +1203,23 @@ viewport.addEventListener(
         Math.min(MAX_SCALE, scale * zoomFactor),
       );
 
+      // 如果缩放比例没有变化，不执行后续操作
+      if (Math.abs(newScale - scale) < 0.001) {
+        return;
+      }
+
       // 调整 panX 和 panY，使缩放以鼠标位置为中心
       panX = mouseX - canvasX * newScale;
       panY = mouseY - canvasY * newScale;
       scale = newScale;
+
+      updateCanvasTransform();
     } else {
       // 普通滚轮或触控板双指滑动 - 移动画布
       panX -= e.deltaX;
       panY -= e.deltaY;
+      updateCanvasTransform();
     }
-
-    updateCanvasTransform();
   },
   { passive: false },
 );

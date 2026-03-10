@@ -35,6 +35,37 @@ const canvas = document.getElementById("canvas");
 const svg = document.getElementById("connections");
 const emptyState = document.getElementById("emptyState");
 
+// Toast 提示函数
+function showToast(message, type = "info") {
+  const container = document.getElementById("toast-container");
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+
+  const icons = {
+    success: "✓",
+    error: "✕",
+    info: "ℹ",
+  };
+
+  toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span>${message}</span>`;
+  container.appendChild(toast);
+
+  // 触发动画
+  requestAnimationFrame(() => {
+    toast.classList.add("show");
+  });
+
+  // 3秒后移除
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => {
+      if (container.contains(toast)) {
+        container.removeChild(toast);
+      }
+    }, 300);
+  }, 3000);
+}
+
 // Excel文件上传处理
 document
   .getElementById("fileInput")
@@ -1156,11 +1187,19 @@ async function copyCanvas() {
     const originalWidth = canvas.style.width;
     const originalHeight = canvas.style.height;
     const originalOverflow = canvas.style.overflow;
+    const originalPosition = canvas.style.position;
+    const originalLeft = canvas.style.left;
+    const originalTop = canvas.style.top;
 
     // 保存SVG原始样式
     const originalSvgWidth = svg.style.width;
     const originalSvgHeight = svg.style.height;
     const originalSvgViewBox = svg.getAttribute("viewBox");
+
+    // 将画布移到屏幕外，避免样式调整时的视觉跳动
+    canvas.style.position = "absolute";
+    canvas.style.left = "-99999px";
+    canvas.style.top = "-99999px";
 
     // 设置画布为完整内容大小
     canvas.style.transform = "none";
@@ -1200,6 +1239,9 @@ async function copyCanvas() {
     canvas.style.width = originalWidth;
     canvas.style.height = originalHeight;
     canvas.style.overflow = originalOverflow;
+    canvas.style.position = originalPosition;
+    canvas.style.left = originalLeft;
+    canvas.style.top = originalTop;
 
     // 恢复SVG样式
     svg.style.width = originalSvgWidth;
@@ -1217,10 +1259,10 @@ async function copyCanvas() {
         await navigator.clipboard.write([
           new ClipboardItem({ "image/png": blob }),
         ]);
-        alert("画布已复制到剪贴板！");
+        showToast("画布已复制到剪贴板", "success");
       } catch (err) {
         console.error("复制失败:", err);
-        alert("复制失败，请使用下载功能");
+        showToast("复制失败，请使用下载功能", "error");
       }
     }, "image/png");
   } catch (error) {
@@ -1251,11 +1293,19 @@ async function downloadPNG() {
     const originalWidth = canvas.style.width;
     const originalHeight = canvas.style.height;
     const originalOverflow = canvas.style.overflow;
+    const originalPosition = canvas.style.position;
+    const originalLeft = canvas.style.left;
+    const originalTop = canvas.style.top;
 
     // 保存SVG原始样式
     const originalSvgWidth = svg.style.width;
     const originalSvgHeight = svg.style.height;
     const originalSvgViewBox = svg.getAttribute("viewBox");
+
+    // 将画布移到屏幕外，避免样式调整时的视觉跳动
+    canvas.style.position = "absolute";
+    canvas.style.left = "-99999px";
+    canvas.style.top = "-99999px";
 
     // 设置画布为完整内容大小
     canvas.style.transform = "none";
@@ -1295,6 +1345,9 @@ async function downloadPNG() {
     canvas.style.width = originalWidth;
     canvas.style.height = originalHeight;
     canvas.style.overflow = originalOverflow;
+    canvas.style.position = originalPosition;
+    canvas.style.left = originalLeft;
+    canvas.style.top = originalTop;
 
     // 恢复SVG样式
     svg.style.width = originalSvgWidth;

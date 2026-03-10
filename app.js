@@ -1,6 +1,8 @@
 // 全局变量
 let nodes = [];
 let scale = 0.7; // 默认缩放级别设为0.7，让脑图显示更小
+const MIN_SCALE = 0.3; // 最小缩放级别：30%
+const MAX_SCALE = 2; // 最大缩放级别：200%
 let panX = 0;
 let panY = 0;
 let isPanning = false;
@@ -1026,12 +1028,12 @@ function updateCanvasTransform() {
 
 // 缩放控制
 function zoomIn() {
-  scale = Math.min(scale * 1.2, 3);
+  scale = Math.min(scale * 1.2, MAX_SCALE);
   updateCanvasTransform();
 }
 
 function zoomOut() {
-  scale = Math.max(scale / 1.2, 0.2);
+  scale = Math.max(scale / 1.2, MIN_SCALE);
   updateCanvasTransform();
 }
 
@@ -1075,14 +1077,43 @@ document.addEventListener("mouseup", () => {
   }
 });
 
-// 鼠标滚轮/触摸板 - 移动画布而不是缩放
+// 鼠标滚轮/触摸板 - 支持平移和缩放
 viewport.addEventListener(
   "wheel",
   (e) => {
     e.preventDefault();
-    // 使用deltaX和deltaY来移动画布
-    panX -= e.deltaX;
-    panY -= e.deltaY;
+
+    // 检测是否是触控板缩放手势（ctrlKey 为 true 表示缩放）
+    if (e.ctrlKey || e.metaKey) {
+      // 触控板两指缩放
+      // deltaY > 0 表示缩小，deltaY < 0 表示放大
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+
+      // 计算鼠标位置相对于画布的坐标
+      const rect = viewport.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // 转换为画布坐标系
+      const canvasX = (mouseX - panX) / scale;
+      const canvasY = (mouseY - panY) / scale;
+
+      // 应用缩放
+      const newScale = Math.max(
+        MIN_SCALE,
+        Math.min(MAX_SCALE, scale * zoomFactor),
+      );
+
+      // 调整 panX 和 panY，使缩放以鼠标位置为中心
+      panX = mouseX - canvasX * newScale;
+      panY = mouseY - canvasY * newScale;
+      scale = newScale;
+    } else {
+      // 普通滚轮或触控板双指滑动 - 移动画布
+      panX -= e.deltaX;
+      panY -= e.deltaY;
+    }
+
     updateCanvasTransform();
   },
   { passive: false },

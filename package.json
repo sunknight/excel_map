@@ -1,13 +1,17 @@
 {
   "name": "excel-mindmap-generator",
   "version": "1.0.0",
-  "description": "Excel测试用例脑图生成工具",
+  "description": "Excel脑图生成工具",
   "main": "index.html",
   "scripts": {
     "start": "npx http-server -p 38195 -o",
     "dev": "npx http-server -p 38195 -o"
   },
-  "keywords": ["excel", "mindmap", "test-cases"],
+  "keywords": [
+    "excel",
+    "mindmap",
+    "test-cases"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {

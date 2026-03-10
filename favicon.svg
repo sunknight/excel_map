@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <!-- 渐变定义 -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A8F1F;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3E7C17;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="nodeGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F0F9E6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E0F2D0;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="nodeGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#A3D977;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8FC960;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="nodeGradient3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#66B240;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#559535;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- 阴影滤镜 -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="1" stdDeviation="0.5" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 - 圆角矩形带渐变 -->
+  <rect width="32" height="32" fill="url(#bgGradient)" rx="7"/>
+
+  <!-- 装饰性内边框 -->
+  <rect x="2" y="2" width="28" height="28" fill="none" stroke="#F0F9E6" stroke-width="0.5" stroke-opacity="0.2" rx="6"/>
+
+  <!-- 根节点 -->
+  <rect x="13" y="4" width="6" height="6" fill="url(#nodeGradient1)" rx="1.5" filter="url(#shadow)"/>
+  <circle cx="16" cy="7" r="1.5" fill="#3E7C17" opacity="0.4"/>
+
+  <!-- 主连接线 -->
+  <rect x="15.5" y="10" width="1" height="4" fill="#F0F9E6" opacity="0.9"/>
+  <rect x="15.5" y="14" width="1" height="3" fill="#F0F9E6" opacity="0.9"/>
+
+  <!-- 横向分支线 -->
+  <rect x="9" y="16.5" width="14" height="1" fill="#F0F9E6" opacity="0.9"/>
+
+  <!-- 左分支连接线 -->
+  <rect x="11" y="17" width="1" height="2" fill="#F0F9E6" opacity="0.8"/>
+  <rect x="11" y="19" width="1" height="2" fill="#F0F9E6" opacity="0.8"/>
+
+  <!-- 中间分支连接线 -->
+  <rect x="15.5" y="17" width="1" height="2" fill="#F0F9E6" opacity="0.8"/>
+  <rect x="15.5" y="19" width="1" height="2" fill="#F0F9E6" opacity="0.8"/>
+
+  <!-- 右分支连接线 -->
+  <rect x="20" y="17" width="1" height="2" fill="#F0F9E6" opacity="0.8"/>
+  <rect x="20" y="19" width="1" height="2" fill="#F0F9E6" opacity="0.8"/>
+
+  <!-- 左侧二级节点 -->
+  <rect x="9" y="21" width="4" height="4" fill="url(#nodeGradient3)" rx="1" filter="url(#shadow)"/>
+  <rect x="9" y="25" width="4" height="4" fill="url(#nodeGradient1)" rx="1"/>
+
+  <!-- 中间二级节点 -->
+  <rect x="14" y="21" width="4" height="4" fill="url(#nodeGradient2)" rx="1" filter="url(#shadow)"/>
+  <rect x="14" y="25" width="4" height="4" fill="url(#nodeGradient1)" rx="1"/>
+
+  <!-- 右侧二级节点 -->
+  <rect x="19" y="21" width="4" height="4" fill="url(#nodeGradient3)" rx="1" filter="url(#shadow)"/>
+  <rect x="19" y="25" width="4" height="4" fill="url(#nodeGradient1)" rx="1"/>
+
+  <!-- 高光效果 -->
+  <rect x="3" y="3" width="10" height="10" fill="#FFFFFF" opacity="0.1" rx="5"/>
+</svg>

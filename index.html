@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Excel脑图</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family:
+                    "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial,
+                    sans-serif;
+                background: #f5f7fa;
+                min-height: 100vh;
+                overflow: hidden;
+            }
+
+            .header {
+                background: #ffffff;
+                padding: 15px 20px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                z-index: 1000;
+                position: relative;
+                border-bottom: 3px solid #1890ff;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .header-left {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+
+            .header h1 {
+                color: #262626;
+                font-size: 20px;
+                margin: 0;
+                font-weight: 600;
+            }
+
+            .file-upload {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .file-upload input[type="file"] {
+                display: none;
+            }
+
+            .upload-btn {
+                padding: 8px 16px;
+                background: #1890ff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background 0.2s;
+            }
+
+            .upload-btn:hover {
+                background: #096dd9;
+            }
+
+            .file-name {
+                color: #595959;
+                font-size: 13px;
+                max-width: 200px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .sheet-selector {
+                display: none;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .sheet-selector.active {
+                display: flex;
+            }
+
+            .sheet-selector select {
+                padding: 6px 12px;
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+                background: #ffffff;
+                color: #595959;
+                font-size: 13px;
+                cursor: pointer;
+                min-width: 150px;
+            }
+
+            .sheet-selector select:hover {
+                border-color: #1890ff;
+            }
+
+            .controls {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .controls button {
+                padding: 6px 14px;
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+                background: #ffffff;
+                color: #595959;
+                cursor: pointer;
+                font-size: 13px;
+                transition: all 0.2s;
+                font-weight: 500;
+            }
+
+            .controls button:hover {
+                color: #1890ff;
+                border-color: #1890ff;
+            }
+
+            .controls button:active {
+                background: #f0f5ff;
+            }
+
+            .controls button:disabled {
+                cursor: not-allowed;
+                opacity: 0.5;
+            }
+
+            #viewport {
+                width: 100%;
+                height: calc(100vh - 70px);
+                overflow: hidden;
+                position: relative;
+                background: #f5f7fa;
+                background-image: radial-gradient(
+                    circle,
+                    #d9d9d9 1px,
+                    transparent 1px
+                );
+                background-size: 20px 20px;
+            }
+
+            #canvas {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                transform-origin: 0 0;
+            }
+
+            svg.connections {
+                position: absolute;
+                top: 0;
+                left: 0;
+                pointer-events: none;
+                z-index: 0;
+                overflow: visible;
+            }
+
+            .node {
+                position: absolute;
+                background: #ffffff;
+                border-radius: 6px;
+                padding: 12px 16px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                border: 2px solid #e8e8e8;
+                cursor: move;
+                user-select: none;
+                min-width: 180px;
+                max-width: 260px;
+                min-height: 70px;
+                transition:
+                    box-shadow 0.2s,
+                    border-color 0.2s;
+                z-index: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                line-height: 1.5;
+            }
+
+            .node-text {
+                width: 100%;
+                display: -webkit-box;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 2;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                word-break: break-word;
+                font-size: 16px;
+            }
+
+            .node:hover {
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+                z-index: 10;
+            }
+
+            .node.dragging {
+                opacity: 0.9;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+                z-index: 100;
+            }
+
+            .node.level-0 {
+                background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+                color: white;
+                font-size: 16px;
+                font-weight: 600;
+                border-color: #1890ff;
+                min-width: 200px;
+                min-height: 80px;
+                box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+            }
+
+            .node.level-1 {
+                background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+                color: white;
+                font-weight: 600;
+                font-size: 16px;
+                border-color: #52c41a;
+                min-height: 75px;
+                box-shadow: 0 3px 10px rgba(82, 196, 26, 0.25);
+            }
+
+            .node.level-2 {
+                background: linear-gradient(135deg, #13c2c2 0%, #08979c 100%);
+                color: white;
+                font-size: 16px;
+                border-color: #13c2c2;
+                min-height: 70px;
+                box-shadow: 0 3px 10px rgba(19, 194, 194, 0.25);
+            }
+
+            .node.level-3 {
+                background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);
+                color: white;
+                font-size: 15px;
+                border-color: #722ed1;
+                min-height: 65px;
+                box-shadow: 0 3px 10px rgba(114, 46, 209, 0.25);
+            }
+
+            .node.level-4 {
+                background: #ffffff;
+                color: #262626;
+                font-size: 13px;
+                border-color: #d9d9d9;
+                min-width: 600px;
+                max-width: 600px;
+                min-height: 40px;
+                padding: 8px 16px;
+                cursor: pointer !important;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                justify-content: flex-start;
+                text-align: left;
+            }
+
+            .node.level-4:hover {
+                border-color: #1890ff;
+                box-shadow: 0 4px 16px rgba(24, 144, 255, 0.2);
+            }
+
+            .connection {
+                stroke: #bfbfbf;
+                stroke-width: 2;
+                fill: none;
+                opacity: 0.6;
+            }
+
+            .connection:hover {
+                stroke: #8c8c8c;
+                opacity: 1;
+            }
+
+            .stats {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: rgba(255, 255, 255, 0.96);
+                padding: 12px 16px;
+                border-radius: 6px;
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+                font-size: 13px;
+                color: #595959;
+                border: 1px solid #e8e8e8;
+                z-index: 1000;
+            }
+
+            .legend {
+                position: fixed;
+                bottom: 20px;
+                left: 20px;
+                background: rgba(255, 255, 255, 0.96);
+                padding: 12px 16px;
+                border-radius: 6px;
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+                font-size: 12px;
+                border: 1px solid #e8e8e8;
+                z-index: 1000;
+            }
+
+            .legend-title {
+                font-weight: 600;
+                color: #262626;
+                margin-bottom: 8px;
+                padding-bottom: 6px;
+                border-bottom: 1px solid #e8e8e8;
+            }
+
+            .legend-item {
+                display: flex;
+                align-items: center;
+                margin: 6px 0;
+                color: #595959;
+            }
+
+            .legend-color {
+                width: 16px;
+                height: 16px;
+                border-radius: 3px;
+                margin-right: 8px;
+                border: 1px solid rgba(0, 0, 0, 0.1);
+            }
+
+            .zoom-controls {
+                position: fixed;
+                top: 90px;
+                right: 20px;
+                background: rgba(255, 255, 255, 0.96);
+                padding: 8px;
+                border-radius: 6px;
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                border: 1px solid #e8e8e8;
+                z-index: 1000;
+            }
+
+            .zoom-controls button {
+                width: 36px;
+                height: 36px;
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+                background: #ffffff;
+                color: #595959;
+                cursor: pointer;
+                font-size: 16px;
+                transition: all 0.2s;
+            }
+
+            .zoom-controls button:hover {
+                color: #1890ff;
+                border-color: #1890ff;
+            }
+
+            .zoom-controls button:active {
+                background: #f0f5ff;
+            }
+
+            #modal {
+                font-family:
+                    "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial,
+                    sans-serif;
+            }
+
+            #modal-content::-webkit-scrollbar {
+                width: 8px;
+            }
+
+            #modal-content::-webkit-scrollbar-track {
+                background: #f0f0f0;
+                border-radius: 4px;
+            }
+
+            #modal-content::-webkit-scrollbar-thumb {
+                background: #bfbfbf;
+                border-radius: 4px;
+            }
+
+            #modal-content::-webkit-scrollbar-thumb:hover {
+                background: #8c8c8c;
+            }
+
+            .empty-state {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                text-align: center;
+                color: #8c8c8c;
+            }
+
+            .empty-state p {
+                margin: 10px 0;
+                font-size: 16px;
+            }
+
+            .empty-state .icon {
+                font-size: 48px;
+                margin-bottom: 20px;
+            }
+
+            .detail-row {
+                margin-bottom: 16px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #e8e8e8;
+            }
+
+            .detail-row:last-child {
+                border-bottom: none;
+            }
+
+            .detail-label {
+                font-weight: 600;
+                color: #262626;
+                margin-bottom: 8px;
+                font-size: 14px;
+            }
+
+            .detail-value {
+                color: #595959;
+                font-size: 13px;
+                line-height: 1.6;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+
+            .priority-tag {
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: 2px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            .priority-P1 {
+                background: #fff1f0;
+                color: #ff4d4f;
+                border: 1px solid #ffa39e;
+            }
+
+            .priority-P2 {
+                background: #fff7e6;
+                color: #fa8c16;
+                border: 1px solid #ffd591;
+            }
+
+            .priority-P3 {
+                background: #f6ffed;
+                color: #52c41a;
+                border: 1px solid #b7eb8f;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="header-left">
+                <h1>Excel脑图</h1>
+                <div class="file-upload">
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" />
+                    <button
+                        class="upload-btn"
+                        onclick="document.getElementById('fileInput').click()"
+                    >
+                        📁 上传Excel文件
+                    </button>
+                    <span class="file-name" id="fileName"></span>
+                </div>
+                <div class="sheet-selector" id="sheetSelector">
+                    <select id="sheetSelect" onchange="switchSheet()">
+                        <option value="">选择工作表</option>
+                    </select>
+                    <button
+                        onclick="showFieldSelector()"
+                        id="fieldSelectorBtn"
+                        style="
+                            padding: 6px 12px;
+                            background: #52c41a;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 13px;
+                        "
+                    >
+                        ⚙️ 配置字段
+                    </button>
+                </div>
+            </div>
+            <div class="controls">
+                <button onclick="resetLayout()" id="resetBtn" disabled>
+                    重置布局
+                </button>
+                <button onclick="expandAll()" id="expandBtn" disabled>
+                    展开所有
+                </button>
+                <button onclick="collapseAll()" id="collapseBtn" disabled>
+                    折叠所有
+                </button>
+                <button onclick="autoLayout()" id="autoLayoutBtn" disabled>
+                    自动布局
+                </button>
+                <button onclick="fitToScreen()" id="fitBtn" disabled>
+                    适应屏幕
+                </button>
+                <button onclick="copyCanvas()" id="copyBtn" disabled>
+                    复制画布
+                </button>
+                <button onclick="downloadPNG()" id="downloadBtn" disabled>
+                    下载PNG
+                </button>
+            </div>
+        </div>
+
+        <div id="viewport">
+            <div id="canvas">
+                <svg class="connections" id="connections"></svg>
+                <div class="empty-state" id="emptyState">
+                    <div class="icon">📊</div>
+                    <p>请上传Excel文件生成脑图</p>
+                    <p style="font-size: 13px; color: #bfbfbf">
+                        支持.xlsx和.xls格式
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="zoom-controls">
+            <button onclick="zoomIn()" title="放大">+</button>
+            <button onclick="zoomOut()" title="缩小">−</button>
+            <button onclick="resetZoom()" title="重置">⊙</button>
+        </div>
+
+        <!-- Modal for displaying test case details -->
+        <div
+            id="modal"
+            style="
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 2000;
+                justify-content: center;
+                align-items: center;
+            "
+        >
+            <div
+                style="
+                    background: white;
+                    border-radius: 8px;
+                    width: 600px;
+                    max-height: 80vh;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                "
+            >
+                <div
+                    style="
+                        padding: 20px 24px;
+                        border-bottom: 1px solid #e8e8e8;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        background: white;
+                        border-radius: 8px 8px 0 0;
+                    "
+                >
+                    <h2
+                        style="
+                            margin: 0;
+                            font-size: 18px;
+                            color: #262626;
+                        "
+                        id="modal-title"
+                    >
+                        测试用例详情
+                    </h2>
+                    <button
+                        onclick="closeModal()"
+                        style="
+                            border: none;
+                            background: none;
+                            font-size: 24px;
+                            cursor: pointer;
+                            color: #8c8c8c;
+                            padding: 0;
+                            width: 32px;
+                            height: 32px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        "
+                    >
+                        ×
+                    </button>
+                </div>
+                <div
+                    id="modal-content"
+                    style="padding: 24px; overflow-y: auto; flex: 1"
+                ></div>
+            </div>
+        </div>
+
+        <!-- Modal for field selector -->
+        <div
+            id="fieldModal"
+            style="
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 2000;
+                justify-content: center;
+                align-items: center;
+            "
+        >
+            <div
+                style="
+                    background: white;
+                    border-radius: 8px;
+                    width: 500px;
+                    max-height: 80vh;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                "
+            >
+                <div
+                    style="
+                        padding: 20px 24px;
+                        border-bottom: 1px solid #e8e8e8;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        background: white;
+                        border-radius: 8px 8px 0 0;
+                    "
+                >
+                    <h2 style="margin: 0; font-size: 18px; color: #262626">
+                        ⚙️ 配置脑图字段
+                    </h2>
+                    <button
+                        onclick="closeFieldModal()"
+                        style="
+                            border: none;
+                            background: none;
+                            font-size: 24px;
+                            cursor: pointer;
+                            color: #8c8c8c;
+                            padding: 0;
+                            width: 32px;
+                            height: 32px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        "
+                    >
+                        ×
+                    </button>
+                </div>
+                <div
+                    id="fieldModal-content"
+                    style="padding: 24px; overflow-y: auto; flex: 1"
+                >
+                    <div style="margin-bottom: 20px">
+                        <label
+                            style="
+                                display: block;
+                                font-weight: 600;
+                                margin-bottom: 8px;
+                                color: #262626;
+                            "
+                        >
+                            Level 1 - 功能字段:
+                        </label>
+                        <select
+                            id="fieldLevel1"
+                            style="
+                                width: 100%;
+                                padding: 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 14px;
+                            "
+                        >
+                            <option value="">请选择字段</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 20px">
+                        <label
+                            style="
+                                display: block;
+                                font-weight: 600;
+                                margin-bottom: 8px;
+                                color: #262626;
+                            "
+                        >
+                            Level 2 - 类型字段:
+                        </label>
+                        <select
+                            id="fieldLevel2"
+                            style="
+                                width: 100%;
+                                padding: 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 14px;
+                            "
+                        >
+                            <option value="">请选择字段</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 20px">
+                        <label
+                            style="
+                                display: block;
+                                font-weight: 600;
+                                margin-bottom: 8px;
+                                color: #262626;
+                            "
+                        >
+                            Level 3 - 子功能字段:
+                        </label>
+                        <select
+                            id="fieldLevel3"
+                            style="
+                                width: 100%;
+                                padding: 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 14px;
+                            "
+                        >
+                            <option value="">请选择字段</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 20px">
+                        <label
+                            style="
+                                display: block;
+                                font-weight: 600;
+                                margin-bottom: 8px;
+                                color: #262626;
+                            "
+                        >
+                            Level 4 - 名称字段:
+                        </label>
+                        <select
+                            id="fieldLevel4"
+                            style="
+                                width: 100%;
+                                padding: 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 14px;
+                            "
+                        >
+                            <option value="">请选择字段</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 20px">
+                        <label
+                            style="
+                                display: block;
+                                font-weight: 600;
+                                margin-bottom: 8px;
+                                color: #262626;
+                            "
+                        >
+                            编号字段（可选）:
+                        </label>
+                        <select
+                            id="fieldNumber"
+                            style="
+                                width: 100%;
+                                padding: 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 14px;
+                            "
+                        >
+                            <option value="">请选择字段</option>
+                        </select>
+                    </div>
+                </div>
+                <div
+                    style="
+                        padding: 16px 24px;
+                        border-top: 1px solid #e8e8e8;
+                        display: flex;
+                        gap: 12px;
+                        justify-content: flex-end;
+                    "
+                >
+                    <button
+                        onclick="closeFieldModal()"
+                        style="
+                            padding: 8px 16px;
+                            border: 1px solid #d9d9d9;
+                            border-radius: 4px;
+                            background: white;
+                            cursor: pointer;
+                            font-size: 14px;
+                        "
+                    >
+                        取消
+                    </button>
+                    <button
+                        onclick="applyFieldSettings()"
+                        style="
+                            padding: 8px 16px;
+                            border: none;
+                            border-radius: 4px;
+                            background: #1890ff;
+                            color: white;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: 500;
+                        "
+                    >
+                        生成脑图
+                    </button>
+                </div>
+            </div>
+        </div>
+            <div
+                style="
+                    background: white;
+                    border-radius: 8px;
+                    width: 600px;
+                    max-height: 80vh;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                "
+            >
+                <div
+                    style="
+                        padding: 20px 24px;
+                        border-bottom: 1px solid #e8e8e8;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        background: white;
+                        border-radius: 8px 8px 0 0;
+                    "
+                >
+                    <h2
+                        style="margin: 0; font-size: 18px; color: #262626"
+                        id="modal-title"
+                    >
+                        测试用例详情
+                    </h2>
+                    <button
+                        onclick="closeModal()"
+                        style="
+                            border: none;
+                            background: none;
+                            font-size: 24px;
+                            cursor: pointer;
+                            color: #8c8c8c;
+                            padding: 0;
+                            width: 32px;
+                            height: 32px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        "
+                    >
+                        ×
+                    </button>
+                </div>
+                <div
+                    id="modal-content"
+                    style="padding: 24px; overflow-y: auto; flex: 1"
+                ></div>
+            </div>
+        </div>
+
+        <!-- XLSX Library -->
+        <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+        <script src="app.js"></script>
+    </body>
+</html>

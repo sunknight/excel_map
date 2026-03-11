@@ -565,18 +565,11 @@
                     <select id="sheetSelect" onchange="switchSheet()">
                     </select>
                     <button
-                        onclick="showFieldSelector()"
-                        id="fieldSelectorBtn"
-                        class="config-btn"
-                    >
-                        ⚙️ 配置字段
-                    </button>
-                    <button
                         onclick="showSheetPreview()"
                         id="previewBtn"
                         class="config-btn"
                     >
-                        👁️ 预览和配置
+                        预览和配置
                     </button>
                 </div>
             </div>
@@ -1021,7 +1014,7 @@
                     <h2
                         style="margin: 0; font-size: 18px; color: #262626"
                     >
-                        👁️ 数据预览
+                        数据预览
                     </h2>
                     <button
                         onclick="closePreviewModal()"
@@ -1042,6 +1035,139 @@
                         ×
                     </button>
                 </div>
+
+                <!-- 字段配置区域 -->
+                <div
+                    id="preview-fields-config"
+                    style="
+                        padding: 16px 24px;
+                        background: #f5f5f5;
+                        border-bottom: 1px solid #e8e8e8;
+                        display: flex;
+                        gap: 12px;
+                        flex-wrap: wrap;
+                        align-items: flex-end;
+                    "
+                >
+                    <div style="flex: 1; min-width: 140px;">
+                        <label
+                            style="
+                                display: block;
+                                font-size: 12px;
+                                font-weight: 600;
+                                margin-bottom: 4px;
+                                color: #262626;
+                            "
+                        >
+                            Level 1:
+                        </label>
+                        <select
+                            id="preview-fieldLevel1"
+                            style="
+                                width: 100%;
+                                padding: 6px 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 13px;
+                            "
+                        >
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 140px;">
+                        <label
+                            style="
+                                display: block;
+                                font-size: 12px;
+                                font-weight: 600;
+                                margin-bottom: 4px;
+                                color: #262626;
+                            "
+                        >
+                            Level 2:
+                        </label>
+                        <select
+                            id="preview-fieldLevel2"
+                            style="
+                                width: 100%;
+                                padding: 6px 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 13px;
+                            "
+                        >
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 140px;">
+                        <label
+                            style="
+                                display: block;
+                                font-size: 12px;
+                                font-weight: 600;
+                                margin-bottom: 4px;
+                                color: #262626;
+                            "
+                        >
+                            Level 3:
+                        </label>
+                        <select
+                            id="preview-fieldLevel3"
+                            style="
+                                width: 100%;
+                                padding: 6px 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 13px;
+                            "
+                        >
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 140px;">
+                        <label
+                            style="
+                                display: block;
+                                font-size: 12px;
+                                font-weight: 600;
+                                margin-bottom: 4px;
+                                color: #262626;
+                            "
+                        >
+                            Level 4:
+                        </label>
+                        <select
+                            id="preview-fieldLevel4"
+                            style="
+                                width: 100%;
+                                padding: 6px 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 13px;
+                            "
+                        >
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                    <button
+                        onclick="generateMindmapFromPreview()"
+                        style="
+                            padding: 8px 20px;
+                            border: none;
+                            border-radius: 4px;
+                            background: #5A7BD3;
+                            color: white;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: 500;
+                            height: 32px;
+                            white-space: nowrap;
+                        "
+                    >
+                        生成脑图
+                    </button>
+                </div>
+
                 <div
                     id="previewModal-content"
                     style="

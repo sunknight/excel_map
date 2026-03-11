@@ -250,6 +250,17 @@ function autoMatchFields() {
     }
   });
 
+  // 同步到 window.selectedFields，以便预览时显示当前字段
+  if (matched) {
+    window.selectedFields = {
+      level1: fieldMapping.level1 || "",
+      level2: fieldMapping.level2 || "",
+      level3: fieldMapping.level3 || "",
+      level4: fieldMapping.level4 || "",
+      number: fieldMapping.number || "",
+    };
+  }
+
   return matched;
 }
 
@@ -328,6 +339,15 @@ function applyFieldSettings() {
     level3: level3Field || null,
     level4: level4Field || null,
     number: numberField || null,
+  };
+
+  // 同步到 window.selectedFields，以便预览时显示当前字段
+  window.selectedFields = {
+    level1: level1Field || "",
+    level2: level2Field || "",
+    level3: level3Field || "",
+    level4: level4Field || "",
+    number: numberField || "",
   };
 
   // 关闭弹窗
@@ -1546,11 +1566,89 @@ function showSheetPreview() {
       return;
     }
 
+    // 获取表头
+    const headers = jsonData[0] || [];
+    sheetHeaders = headers.map((h) => sanitizeText(h));
+
     const modal = document.getElementById("previewModal");
     const modalContent = document.getElementById("previewModal-content");
 
     // 清空之前的内容
     modalContent.innerHTML = "";
+
+    // 填充字段选择器
+    const fieldSelectors = [
+      "preview-fieldLevel1",
+      "preview-fieldLevel2",
+      "preview-fieldLevel3",
+      "preview-fieldLevel4",
+    ];
+
+    fieldSelectors.forEach((selectorId) => {
+      const select = document.getElementById(selectorId);
+      select.innerHTML = '<option value="">请选择</option>';
+
+      sheetHeaders.forEach((header) => {
+        const option = document.createElement("option");
+        option.value = header;
+        option.textContent = header;
+        select.appendChild(option);
+      });
+    });
+
+    // 使用已配置的字段（如果存在），否则自动匹配
+    if (window.selectedFields) {
+      document.getElementById("preview-fieldLevel1").value =
+        window.selectedFields.level1 || "";
+      document.getElementById("preview-fieldLevel2").value =
+        window.selectedFields.level2 || "";
+      document.getElementById("preview-fieldLevel3").value =
+        window.selectedFields.level3 || "";
+      document.getElementById("preview-fieldLevel4").value =
+        window.selectedFields.level4 || "";
+    } else {
+      // 尝试自动匹配默认字段
+      const defaultMappings = {
+        "preview-fieldLevel1": fieldMapping.level1,
+        "preview-fieldLevel2": fieldMapping.level2,
+        "preview-fieldLevel3": fieldMapping.level3,
+        "preview-fieldLevel4": fieldMapping.level4,
+      };
+
+      Object.keys(defaultMappings).forEach((selectorId) => {
+        const select = document.getElementById(selectorId);
+        const defaultFields = defaultMappings[selectorId];
+
+        // 查找匹配的字段
+        for (const field of defaultFields) {
+          const option = Array.from(select.options).find(
+            (opt) => opt.value === field,
+          );
+          if (option) {
+            select.value = field;
+            break;
+          }
+        }
+      });
+    }
+
+    // 添加字段变更监听器，实时同步到已配置字段
+    fieldSelectors.forEach((selectorId) => {
+      const select = document.getElementById(selectorId);
+      select.onchange = function () {
+        if (!window.selectedFields) {
+          window.selectedFields = {
+            level1: "",
+            level2: "",
+            level3: "",
+            level4: "",
+            number: "",
+          };
+        }
+        const fieldKey = selectorId.replace("preview-field", "").toLowerCase();
+        window.selectedFields[fieldKey] = this.value;
+      };
+    });
 
     // 创建表格容器
     const tableContainer = document.createElement("div");
@@ -1649,6 +1747,52 @@ function showSheetPreview() {
   } catch (error) {
     console.error("预览数据失败:", error);
     showToast("预览数据失败", "error");
+  }
+}
+
+// 从预览modal生成脑图
+function generateMindmapFromPreview() {
+  const level1 = document.getElementById("preview-fieldLevel1").value;
+  const level2 = document.getElementById("preview-fieldLevel2").value;
+  const level3 = document.getElementById("preview-fieldLevel3").value;
+  const level4 = document.getElementById("preview-fieldLevel4").value;
+
+  // 验证必填字段
+  if (!level1 || !level4) {
+    showToast("请至少选择 Level 1 和 Level 4 字段", "warning");
+    return;
+  }
+
+  // 更新 fieldMapping（这是 parseExcelData 使用的）
+  fieldMapping = {
+    level1: level1 || null,
+    level2: level2 || null,
+    level3: level3 || null,
+    level4: level4 || null,
+    number: null,
+  };
+
+  // 同时保存到 window.selectedFields（用于预览时显示已选字段）
+  window.selectedFields = {
+    level1: level1,
+    level2: level2,
+    level3: level3,
+    level4: level4,
+    number: "",
+  };
+
+  // 关闭预览modal
+  closePreviewModal();
+
+  // 重新解析当前工作表数据并生成脑图
+  if (currentSheet && workbook) {
+    const worksheet = workbook.Sheets[currentSheet];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    if (jsonData.length >= 2) {
+      parseExcelData(jsonData);
+      showToast("脑图生成成功", "success");
+    }
   }
 }
 

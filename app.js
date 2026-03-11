@@ -574,7 +574,7 @@ function createNodes(data, level, parentId) {
     parentId: parentId,
     children: [], // 先初始化为空数组
     testCase: data.testCase || null,
-    expanded: true, // 默认展开所有节点
+    expanded: level <= 4, // Level 0-4 默认展开，Level 5 始终展开（无子节点）
   };
 
   nodes.push(node);
@@ -1225,8 +1225,37 @@ function toggleNode(nodeId) {
     node.expanded = false;
     collapseAllDescendants(nodeId);
   } else {
-    // 展开：只展开当前节点，不展开子节点
+    // 展开：只展开当前节点
     node.expanded = true;
+
+    // 如果是 Level 3 节点，同时展开其所有 Level 4 子节点及其 Level 5 子节点
+    if (node.level === 3 && node.children && node.children.length > 0) {
+      node.children.forEach((childId) => {
+        const childNode = nodes[childId];
+        if (childNode && childNode.level === 4) {
+          childNode.expanded = true;
+          // 同时展开 Level 4 的 Level 5 子节点
+          if (childNode.children && childNode.children.length > 0) {
+            childNode.children.forEach((grandchildId) => {
+              const grandchildNode = nodes[grandchildId];
+              if (grandchildNode && grandchildNode.level === 5) {
+                grandchildNode.expanded = true;
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // 如果是 Level 4 节点，同时展开其所有 Level 5 子节点
+    if (node.level === 4 && node.children && node.children.length > 0) {
+      node.children.forEach((childId) => {
+        const childNode = nodes[childId];
+        if (childNode && childNode.level === 5) {
+          childNode.expanded = true;
+        }
+      });
+    }
   }
 
   // 重新布局，但不更新画布变换

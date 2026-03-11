@@ -306,6 +306,25 @@
                 box-shadow: 0 4px 16px rgba(90, 123, 211, 0.2);
             }
 
+            .node.level-5 {
+                background: transparent;
+                color: #9ca3af;
+                font-size: 11px;
+                border: none !important;
+                box-shadow: none !important;
+                min-width: auto;
+                max-width: 600px;
+                min-height: 24px;
+                padding: 4px 16px;
+                cursor: default !important;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                justify-content: flex-start;
+                text-align: left;
+                pointer-events: none;
+            }
+
             .connection {
                 stroke: #bfbfbf;
                 stroke-width: 2;
@@ -1157,6 +1176,31 @@
                             "
                         >
                             <option value="">请选择</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 140px;">
+                        <label
+                            style="
+                                display: block;
+                                font-size: 12px;
+                                font-weight: 600;
+                                margin-bottom: 4px;
+                                color: #262626;
+                            "
+                        >
+                            附加信息:
+                        </label>
+                        <select
+                            id="preview-fieldLevel5"
+                            style="
+                                width: 100%;
+                                padding: 6px 8px;
+                                border: 1px solid #d9d9d9;
+                                border-radius: 4px;
+                                font-size: 13px;
+                            "
+                        >
+                            <option value="">不显示</option>
                         </select>
                     </div>
                     <button

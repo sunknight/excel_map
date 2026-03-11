@@ -257,6 +257,7 @@ function autoMatchFields() {
       level2: fieldMapping.level2 || "",
       level3: fieldMapping.level3 || "",
       level4: fieldMapping.level4 || "",
+      level5: fieldMapping.level5 || "",
       number: fieldMapping.number || "",
     };
   }
@@ -347,6 +348,7 @@ function applyFieldSettings() {
     level2: level2Field || "",
     level3: level3Field || "",
     level4: level4Field || "",
+    level5: "",
     number: numberField || "",
   };
 
@@ -376,6 +378,7 @@ function parseExcelData(rawData) {
     level2: fieldMapping.level2 ? headers.indexOf(fieldMapping.level2) : -1,
     level3: fieldMapping.level3 ? headers.indexOf(fieldMapping.level3) : -1,
     level4: fieldMapping.level4 ? headers.indexOf(fieldMapping.level4) : -1,
+    level5: fieldMapping.level5 ? headers.indexOf(fieldMapping.level5) : -1,
   };
 
   // 提取数据 - 保存所有字段
@@ -387,6 +390,7 @@ function parseExcelData(rawData) {
         _level2: row[fieldMap.level2] || "默认", // 类型
         _level3: row[fieldMap.level3] || "未分类", // 子功能
         _level4: row[fieldMap.level4] || "未命名", // 用例名称
+        _level5: fieldMap.level5 >= 0 ? row[fieldMap.level5] : null, // 附加信息
         _number: row[fieldMap.number] || index + 2, // 编号
         _headers: headers, // 保存所有表头
         _rawData: row, // 保存原始数据
@@ -488,11 +492,24 @@ function generateMindmapData() {
                   : "默认";
                 const number = testCase._number || "";
 
-                level3Node.children.push({
+                const level4Node = {
                   name: `${number ? "#" + number + "：" : ""}${level4}`,
                   level: 4,
                   testCase: testCase,
-                });
+                  children: [],
+                };
+
+                // 如果有 Level 5 附加信息，添加为子节点
+                if (testCase._level5) {
+                  level4Node.children.push({
+                    name: String(testCase._level5),
+                    level: 5,
+                    testCase: null,
+                    children: [],
+                  });
+                }
+
+                level3Node.children.push(level4Node);
               });
 
               level2Node.children.push(level3Node);
@@ -587,13 +604,30 @@ function autoLayout(skipUpdateTransform = false) {
     if (node.level === 4) {
       return 40; // 用例节点高度
     }
+    if (node.level === 5) {
+      return 24; // 附加信息节点高度
+    }
     return NODE_HEIGHT;
+  }
+
+  // 根据节点层级获取节点宽度
+  function getNodeWidth(node) {
+    if (node.level === 4) {
+      return 600; // 用例节点宽度（固定）
+    }
+    if (node.level === 5) {
+      return 0; // Level 5 节点宽度自适应，由 CSS 控制
+    }
+    return NODE_WIDTH;
   }
 
   // 根据节点层级获取垂直间距
   function getVerticalGap(parentNode) {
     if (parentNode.level === 3) {
       return 15; // 类型到用例的间距更小
+    }
+    if (parentNode.level === 4) {
+      return 8; // Level 4 到 Level 5 的间距最小
     }
     return VERTICAL_GAP;
   }
@@ -628,9 +662,30 @@ function autoLayout(skipUpdateTransform = false) {
   function layoutNode(nodeId, depth, startY) {
     const node = nodes[nodeId];
     const nodeHeight = getNodeHeight(node);
+    const nodeWidth = getNodeWidth(node);
 
-    // 设置X坐标（基于深度）
-    node.x = 100 + depth * (NODE_WIDTH + HORIZONTAL_GAP);
+    // 设置X坐标（基于深度和节点宽度）
+    // 计算当前层的累积偏移
+    let xOffset = 100;
+    for (let d = 0; d < depth; d++) {
+      // 找到该深度的任意节点来获取宽度
+      const nodeAtDepth = nodes.find((n) => {
+        // 计算该节点的深度
+        let currentDepth = 0;
+        let tempNode = n;
+        while (tempNode.parentId !== -1) {
+          tempNode = nodes[tempNode.parentId];
+          currentDepth++;
+        }
+        return currentDepth === d;
+      });
+      if (nodeAtDepth) {
+        xOffset += getNodeWidth(nodeAtDepth) + HORIZONTAL_GAP;
+      } else {
+        xOffset += NODE_WIDTH + HORIZONTAL_GAP;
+      }
+    }
+    node.x = xOffset;
 
     // 设置Y坐标
     if (!node.expanded || node.children.length === 0) {
@@ -739,7 +794,7 @@ function renderNodes() {
     }
 
     const nodeElement = document.createElement("div");
-    nodeElement.className = `node level-${Math.min(node.level, 4)}`;
+    nodeElement.className = `node level-${node.level}`;
     nodeElement.id = `node-${node.id}`;
 
     // 添加展开/折叠指示器（如果有子节点）
@@ -1678,11 +1733,14 @@ function showSheetPreview() {
       "preview-fieldLevel2",
       "preview-fieldLevel3",
       "preview-fieldLevel4",
+      "preview-fieldLevel5",
     ];
 
     fieldSelectors.forEach((selectorId) => {
       const select = document.getElementById(selectorId);
-      select.innerHTML = '<option value="">请选择</option>';
+      const placeholder =
+        selectorId === "preview-fieldLevel5" ? "不显示" : "请选择";
+      select.innerHTML = `<option value="">${placeholder}</option>`;
 
       sheetHeaders.forEach((header) => {
         const option = document.createElement("option");
@@ -1702,6 +1760,8 @@ function showSheetPreview() {
         window.selectedFields.level3 || "";
       document.getElementById("preview-fieldLevel4").value =
         window.selectedFields.level4 || "";
+      document.getElementById("preview-fieldLevel5").value =
+        window.selectedFields.level5 || "";
     } else {
       // 尝试自动匹配默认字段
       const defaultMappings = {
@@ -1852,6 +1912,7 @@ function generateMindmapFromPreview() {
   const level2 = document.getElementById("preview-fieldLevel2").value;
   const level3 = document.getElementById("preview-fieldLevel3").value;
   const level4 = document.getElementById("preview-fieldLevel4").value;
+  const level5 = document.getElementById("preview-fieldLevel5").value;
 
   // 验证必填字段
   if (!level1 || !level4) {
@@ -1865,6 +1926,7 @@ function generateMindmapFromPreview() {
     level2: level2 || null,
     level3: level3 || null,
     level4: level4 || null,
+    level5: level5 || null, // Level 5 附加信息
     number: null,
   };
 
@@ -1874,6 +1936,7 @@ function generateMindmapFromPreview() {
     level2: level2,
     level3: level3,
     level4: level4,
+    level5: level5,
     number: "",
   };
 

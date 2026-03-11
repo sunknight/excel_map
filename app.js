@@ -527,6 +527,9 @@ function generateMindmapData() {
 
 // 渲染脑图
 function renderMindmap() {
+  // 检查是否是重新生成（已有脑图）
+  const isRegenerating = nodes.length > 0;
+
   // 清空现有内容
   nodes = [];
   svg.innerHTML = "";
@@ -555,8 +558,8 @@ function renderMindmap() {
   // 自动布局
   autoLayout();
 
-  // 定位到根节点
-  focusOnRootNode();
+  // 定位到根节点（重新生成时不使用动画）
+  focusOnNode(nodes[0].id, !isRegenerating);
 }
 
 // 创建节点 - 修复版本，确保正确的节点顺序
@@ -1135,7 +1138,7 @@ function focusOnRootNode() {
 }
 
 // 定位到指定节点（左侧30%，垂直居中）
-function focusOnNode(nodeId) {
+function focusOnNode(nodeId, animate = true) {
   if (nodes.length === 0) return;
 
   // 等待DOM渲染完成
@@ -1163,7 +1166,14 @@ function focusOnNode(nodeId) {
         const newPanY = targetY - (nodeY + nodeHeight / 2) * scale;
 
         // 使用动画过渡到新位置
-        animatePanTo(newPanX, newPanY);
+        if (animate) {
+          animatePanTo(newPanX, newPanY);
+        } else {
+          // 不使用动画，直接设置位置
+          panX = newPanX;
+          panY = newPanY;
+          updateCanvasTransform();
+        }
 
         // 高亮显示目标节点
         targetElement.style.boxShadow = "0 0 0 3px rgba(90, 123, 211, 0.5)";

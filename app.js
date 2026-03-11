@@ -1347,17 +1347,33 @@ function collapseAll() {
 function fitToScreen() {
   if (nodes.length === 0) return;
 
-  // 计算边界
+  // 计算边界 - 只包含可见节点
   let minX = Infinity,
     minY = Infinity,
     maxX = -Infinity,
     maxY = -Infinity;
 
   nodes.forEach((node) => {
-    minX = Math.min(minX, node.x);
-    minY = Math.min(minY, node.y);
-    maxX = Math.max(maxX, node.x + getNodeWidth(node));
-    maxY = Math.max(maxY, node.y + getNodeHeight(node));
+    // 检查节点是否可见（所有祖先节点都展开）
+    let isVisible = true;
+    if (node.parentId !== -1) {
+      let currentNode = node;
+      while (currentNode.parentId !== -1) {
+        const parentNode = nodes[currentNode.parentId];
+        if (!parentNode.expanded) {
+          isVisible = false;
+          break;
+        }
+        currentNode = parentNode;
+      }
+    }
+
+    if (isVisible) {
+      minX = Math.min(minX, node.x);
+      minY = Math.min(minY, node.y);
+      maxX = Math.max(maxX, node.x + getNodeWidth(node));
+      maxY = Math.max(maxY, node.y + getNodeHeight(node));
+    }
   });
 
   const contentWidth = maxX - minX;

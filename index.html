@@ -23,29 +23,52 @@
 
             .header {
                 background: #ffffff;
-                padding: 15px 20px;
+                padding: 12px 20px;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
                 z-index: 1000;
                 position: relative;
-                border-bottom: 3px solid #1890ff;
+                border-bottom: 3px solid #5A7BD3;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                flex-wrap: wrap;
-                gap: 10px;
+                gap: 20px;
+                flex-wrap: nowrap;
             }
 
-            .header-left {
-                display: flex;
-                align-items: center;
-                gap: 15px;
+            .header-title {
+                flex-shrink: 0;
             }
 
             .header h1 {
-                color: #262626;
+                color: #2A4B8D;
                 font-size: 20px;
                 margin: 0;
                 font-weight: 600;
+                white-space: nowrap;
+            }
+
+            .header-center {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 0;
+            }
+
+            .file-section {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .sheet-section {
+                display: none;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .sheet-section.active {
+                display: flex;
             }
 
             .file-upload {
@@ -59,58 +82,59 @@
             }
 
             .upload-btn {
-                padding: 8px 16px;
-                background: #1890ff;
+                padding: 6px 12px;
+                background: #5A7BD3;
                 color: white;
                 border: none;
                 border-radius: 4px;
                 cursor: pointer;
-                font-size: 14px;
+                font-size: 13px;
                 transition: background 0.2s;
+                white-space: nowrap;
+                flex-shrink: 0;
             }
 
             .upload-btn:hover {
-                background: #096dd9;
+                background: #4a6ab8;
             }
 
-            .file-name {
-                color: #595959;
-                font-size: 13px;
-                max-width: 200px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-
-            .sheet-selector {
-                display: none;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .sheet-selector.active {
-                display: flex;
-            }
-
-            .sheet-selector select {
-                padding: 6px 12px;
+            .sheet-section select {
+                padding: 5px 10px;
                 border: 1px solid #d9d9d9;
                 border-radius: 4px;
                 background: #ffffff;
                 color: #595959;
                 font-size: 13px;
                 cursor: pointer;
-                min-width: 150px;
+                min-width: 200px;
+                max-width: 300px;
+                flex-shrink: 0;
             }
 
-            .sheet-selector select:hover {
-                border-color: #1890ff;
+            .sheet-section select:hover {
+                border-color: #5A7BD3;
+            }
+
+            .config-btn {
+                padding: 5px 12px;
+                background: #5A7BD3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            .config-btn:hover {
+                background: #4a6ab8;
             }
 
             .controls {
                 display: flex;
-                gap: 8px;
-                flex-wrap: wrap;
+                gap: 6px;
+                flex-shrink: 0;
             }
 
             .controls button {
@@ -141,7 +165,7 @@
 
             #viewport {
                 width: 100%;
-                height: calc(100vh - 70px);
+                height: calc(100vh - 75px);
                 overflow: hidden;
                 position: relative;
                 background: #f5f7fa;
@@ -519,39 +543,38 @@
     </head>
     <body>
         <div class="header">
-            <div class="header-left">
+            <!-- 左侧标题 -->
+            <div class="header-title">
                 <h1>Excel脑图</h1>
-                <div class="file-upload">
-                    <input type="file" id="fileInput" accept=".xlsx,.xls" />
-                    <button
-                        class="upload-btn"
-                        onclick="document.getElementById('fileInput').click()"
-                    >
-                        📁 上传Excel文件
-                    </button>
-                    <span class="file-name" id="fileName"></span>
+            </div>
+
+            <!-- 中间文件操作区 -->
+            <div class="header-center">
+                <div class="file-section">
+                    <div class="file-upload">
+                        <input type="file" id="fileInput" accept=".xlsx,.xls" />
+                        <button
+                            class="upload-btn"
+                            onclick="document.getElementById('fileInput').click()"
+                        >
+                            📁 上传Excel文件
+                        </button>
+                    </div>
                 </div>
-                <div class="sheet-selector" id="sheetSelector">
+                <div class="sheet-section" id="sheetSelector">
                     <select id="sheetSelect" onchange="switchSheet()">
-                        <option value="">选择工作表</option>
                     </select>
                     <button
                         onclick="showFieldSelector()"
                         id="fieldSelectorBtn"
-                        style="
-                            padding: 6px 12px;
-                            background: #52c41a;
-                            color: white;
-                            border: none;
-                            border-radius: 4px;
-                            cursor: pointer;
-                            font-size: 13px;
-                        "
+                        class="config-btn"
                     >
                         ⚙️ 配置字段
                     </button>
                 </div>
             </div>
+
+            <!-- 右侧操作按钮区 -->
             <div class="controls">
                 <button onclick="resetLayout()" id="resetBtn" disabled>
                     重置布局
@@ -642,7 +665,7 @@
                         "
                         id="modal-title"
                     >
-                        测试用例详情
+                        详情
                     </h2>
                     <button
                         onclick="closeModal()"
@@ -921,7 +944,7 @@
                         style="margin: 0; font-size: 18px; color: #262626"
                         id="modal-title"
                     >
-                        测试用例详情
+                        详情
                     </h2>
                     <button
                         onclick="closeModal()"

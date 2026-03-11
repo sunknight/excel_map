@@ -113,10 +113,11 @@ function handleFileUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  // 清空之前的脑图
-  clearMindmap();
+  // 清空之前的脑图画布（保留文件和workbook）
+  clearMindmapCanvas();
 
-  document.getElementById("fileName").textContent = file.name;
+  // 保存文件名
+  window.currentFileName = file.name;
 
   const reader = new FileReader();
   reader.onload = function (e) {
@@ -132,26 +133,40 @@ function handleFileUpload(event) {
         return;
       }
 
-      // 填充Sheet选择器
+      // 填充Sheet选择器，包含文件名
       const sheetSelect = document.getElementById("sheetSelect");
-      sheetSelect.innerHTML = '<option value="">请选择工作表</option>';
+      sheetSelect.innerHTML = "";
+
+      // 添加文件名选项（不可选，仅显示）
+      if (window.currentFileName) {
+        const fileNameOption = document.createElement("option");
+        fileNameOption.value = "";
+        fileNameOption.textContent = `📄 ${window.currentFileName}`;
+        fileNameOption.disabled = true;
+        fileNameOption.style.fontWeight = "bold";
+        fileNameOption.style.color = "#2A4B8D";
+        sheetSelect.appendChild(fileNameOption);
+      }
+
+      // 添加分隔线和选择提示
+      const separatorOption = document.createElement("option");
+      separatorOption.value = "";
+      separatorOption.textContent = "─ 选择工作表 ─";
+      separatorOption.disabled = true;
+      sheetSelect.appendChild(separatorOption);
+
       sheetNames.forEach((name, index) => {
         const option = document.createElement("option");
         option.value = name;
-        option.textContent = name;
+        option.textContent = `📊 ${name}`;
         sheetSelect.appendChild(option);
       });
 
       // 显示Sheet选择器
-      document.getElementById("sheetSelector").classList.add("active");
-
-      // 不自动加载，让用户手动选择
-      console.log(
-        "已加载Excel文件，包含",
-        sheetNames.length,
-        "个工作表:",
-        sheetNames.join(", "),
-      );
+      const sheetSelector = document.getElementById("sheetSelector");
+      if (sheetSelector) {
+        sheetSelector.classList.add("active");
+      }
     } catch (error) {
       console.error("解析Excel文件失败:", error);
       alert("解析Excel文件失败，请检查文件格式");
@@ -368,7 +383,7 @@ function parseExcelData(rawData) {
 // 生成脑图数据结构
 function generateMindmapData() {
   if (testData.length === 0) {
-    alert("没有有效的测试用例数据");
+    alert("没有有效的数据");
     return;
   }
 
@@ -398,7 +413,7 @@ function generateMindmapData() {
 
   // 构建树形结构
   mindmapData = {
-    name: "测试用例",
+    name: "表格",
     level: 0,
     children: [],
   };
@@ -643,11 +658,11 @@ function autoLayout(skipUpdateTransform = false) {
   }
 }
 
-// 计算节点的子用例总数（只计算level 4的测试用例节点）
+// 计算节点的子用例总数（只计算level 4的节点）
 function countChildTestCases(nodeId) {
   const node = nodes[nodeId];
 
-  // 如果是level 4（测试用例节点），返回1
+  // 如果是level 4（节点），返回1
   if (node.level === 4) {
     return 1;
   }
@@ -842,14 +857,14 @@ function addDragEvents(element, nodeId) {
   });
 }
 
-// 显示测试用例详情
+// 显示详情
 function showTestCaseDetail(testCase) {
   const modal = document.getElementById("modal");
   const modalTitle = document.getElementById("modal-title");
   const modalContent = document.getElementById("modal-content");
 
   // 使用用例名称作为标题 - 使用 textContent 防止 XSS
-  modalTitle.textContent = sanitizeText(testCase._level4 || "测试用例详情");
+  modalTitle.textContent = sanitizeText(testCase._level4 || "详情");
 
   // 清空内容
   modalContent.innerHTML = "";
@@ -930,7 +945,7 @@ function clearMindmap() {
   sheetHeaders = [];
 
   // 重置视图
-  scale = 1;
+  scale = 0.7;
   panX = 0;
   panY = 0;
 
@@ -939,13 +954,14 @@ function clearMindmap() {
   svg.style.display = "none";
   emptyState.style.display = "flex";
 
-  // 重置文件名显示
-  document.getElementById("fileName").textContent = "";
+  // 重置文件名
+  window.currentFileName = "";
 
-  // 清空工作表选择器
+  // 隐藏并清空工作表选择器
+  document.getElementById("sheetSelector").classList.remove("active");
   const sheetSelect = document.getElementById("sheetSelect");
   if (sheetSelect) {
-    sheetSelect.innerHTML = "";
+    sheetSelect.innerHTML = '<option value="">选择工作表</option>';
   }
 
   // 禁用控制按钮
@@ -1126,7 +1142,7 @@ function zoomOut() {
 }
 
 function resetZoom() {
-  scale = 1;
+  scale = 0.7;
   panX = 0;
   panY = 0;
   updateCanvasTransform();
@@ -1439,7 +1455,7 @@ async function downloadPNG() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `测试用例脑图_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.png`;
+      a.download = `Excel脑图_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

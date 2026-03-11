@@ -116,8 +116,8 @@ function handleFileUpload(event) {
   // 清空之前的脑图画布（保留文件和workbook）
   clearMindmapCanvas();
 
-  // 保存文件名
-  window.currentFileName = file.name;
+  // 保存文件名（转义防止 XSS）
+  window.currentFileName = sanitizeText(file.name);
 
   const reader = new FileReader();
   reader.onload = function (e) {
@@ -141,7 +141,7 @@ function handleFileUpload(event) {
       if (window.currentFileName) {
         const fileNameOption = document.createElement("option");
         fileNameOption.value = "";
-        fileNameOption.textContent = `📄 ${window.currentFileName}`;
+        fileNameOption.textContent = `📄 ${sanitizeText(window.currentFileName)}`;
         fileNameOption.disabled = true;
         fileNameOption.style.fontWeight = "bold";
         fileNameOption.style.color = "#2A4B8D";
@@ -164,8 +164,8 @@ function handleFileUpload(event) {
 
       sheetNames.forEach((name, index) => {
         const option = document.createElement("option");
-        option.value = name;
-        option.textContent = `📊 ${name}`;
+        option.value = sanitizeText(name);
+        option.textContent = `📊 ${sanitizeText(name)}`;
         sheetSelect.appendChild(option);
       });
 
@@ -187,7 +187,7 @@ function switchSheet() {
   const sheetName = document.getElementById("sheetSelect").value;
   if (!sheetName || !workbook) return;
 
-  currentSheet = sheetName;
+  currentSheet = sanitizeText(sheetName); // 转义 Sheet 名称
 
   try {
     const worksheet = workbook.Sheets[sheetName];
@@ -277,12 +277,17 @@ function autoFillFieldSelectors() {
 
   selectors.forEach((selectorId) => {
     const select = document.getElementById(selectorId);
-    select.innerHTML = '<option value="">请选择字段</option>';
+    select.innerHTML = "";
+
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = "请选择字段";
+    select.appendChild(defaultOption);
 
     sheetHeaders.forEach((header) => {
       const option = document.createElement("option");
-      option.value = header;
-      option.textContent = header;
+      option.value = sanitizeText(header);
+      option.textContent = sanitizeText(header);
       select.appendChild(option);
     });
   });
@@ -386,20 +391,21 @@ function parseExcelData(rawData) {
     .filter((row) => row.length > 0)
     .map((row, index) => {
       const testCase = {
-        _level1: row[fieldMap.level1] || "未分类", // 功能
-        _level2: row[fieldMap.level2] || "默认", // 类型
-        _level3: row[fieldMap.level3] || "未分类", // 子功能
-        _level4: row[fieldMap.level4] || "未命名", // 用例名称
-        _level5: fieldMap.level5 >= 0 ? row[fieldMap.level5] : null, // 附加信息
-        _number: row[fieldMap.number] || index + 2, // 编号
+        _level1: sanitizeText(row[fieldMap.level1] || "未分类"), // 功能
+        _level2: sanitizeText(row[fieldMap.level2] || "默认"), // 类型
+        _level3: sanitizeText(row[fieldMap.level3] || "未分类"), // 子功能
+        _level4: sanitizeText(row[fieldMap.level4] || "未命名"), // 用例名称
+        _level5:
+          fieldMap.level5 >= 0 ? sanitizeText(row[fieldMap.level5]) : null, // 附加信息
+        _number: sanitizeText(String(row[fieldMap.number] || index + 2)), // 编号
         _headers: headers, // 保存所有表头
         _rawData: row, // 保存原始数据
       };
 
-      // 添加所有字段
+      // 添加所有字段（也需要转义）
       headers.forEach((header, idx) => {
         if (!testCase.hasOwnProperty(header) && row[idx] !== undefined) {
-          testCase[header] = row[idx];
+          testCase[header] = sanitizeText(String(row[idx]));
         }
       });
 
@@ -444,7 +450,7 @@ function generateMindmapData() {
 
   // 构建树形结构
   mindmapData = {
-    name: "表格",
+    name: currentSheet || "表格",
     level: 0,
     children: [],
   };
@@ -456,7 +462,7 @@ function generateMindmapData() {
     })
     .forEach((level1) => {
       const level1Node = {
-        name: level1,
+        name: sanitizeText(level1),
         level: 1,
         children: [],
       };
@@ -468,7 +474,7 @@ function generateMindmapData() {
         })
         .forEach((level2) => {
           const level2Node = {
-            name: level2,
+            name: sanitizeText(level2),
             level: 2,
             children: [],
           };
@@ -481,7 +487,7 @@ function generateMindmapData() {
             .forEach((level3) => {
               // 创建三级节点
               const level3Node = {
-                name: level3,
+                name: sanitizeText(level3),
                 level: 3,
                 children: [],
               };
@@ -493,7 +499,9 @@ function generateMindmapData() {
                 const number = testCase._number || "";
 
                 const level4Node = {
-                  name: `${number ? "#" + number + "：" : ""}${level4}`,
+                  name: sanitizeText(
+                    `${number ? "#" + number + "：" : ""}${level4}`,
+                  ),
                   level: 4,
                   testCase: testCase,
                   children: [],
@@ -502,7 +510,7 @@ function generateMindmapData() {
                 // 如果有 Level 5 附加信息，添加为子节点
                 if (testCase._level5) {
                   level4Node.children.push({
-                    name: String(testCase._level5),
+                    name: sanitizeText(String(testCase._level5)),
                     level: 5,
                     testCase: null,
                     children: [],
@@ -801,8 +809,9 @@ function renderNodes() {
     nodeElement.id = `node-${node.id}`;
 
     // 添加展开/折叠指示器（如果有子节点）
+    // Level 0-3 显示指示器，Level 4-5 不显示
     let indicator = "";
-    if (node.children && node.children.length > 0) {
+    if (node.children && node.children.length > 0 && node.level <= 3) {
       indicator = node.expanded ? "▼ " : "▶ ";
     }
 
@@ -1076,7 +1085,12 @@ function clearMindmap() {
   document.getElementById("sheetSelector").classList.remove("active");
   const sheetSelect = document.getElementById("sheetSelect");
   if (sheetSelect) {
-    sheetSelect.innerHTML = '<option value="">选择工作表</option>';
+    sheetSelect.innerHTML = "";
+
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = "选择工作表";
+    sheetSelect.appendChild(defaultOption);
   }
 
   // 禁用控制按钮
@@ -1691,7 +1705,10 @@ async function downloadPNG() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Excel脑图_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.png`;
+      const timestamp = new Date()
+        .toLocaleDateString("zh-CN")
+        .replace(/\//g, "-");
+      a.download = `Excel脑图_${sanitizeText(timestamp)}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1796,14 +1813,19 @@ function showSheetPreview() {
 
     fieldSelectors.forEach((selectorId) => {
       const select = document.getElementById(selectorId);
+      select.innerHTML = "";
+
       const placeholder =
         selectorId === "preview-fieldLevel5" ? "不显示" : "请选择";
-      select.innerHTML = `<option value="">${placeholder}</option>`;
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "";
+      defaultOption.textContent = placeholder;
+      select.appendChild(defaultOption);
 
       sheetHeaders.forEach((header) => {
         const option = document.createElement("option");
-        option.value = header;
-        option.textContent = header;
+        option.value = sanitizeText(header);
+        option.textContent = sanitizeText(header);
         select.appendChild(option);
       });
     });

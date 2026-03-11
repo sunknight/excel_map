@@ -155,6 +155,13 @@ function handleFileUpload(event) {
       separatorOption.disabled = true;
       sheetSelect.appendChild(separatorOption);
 
+      // 添加默认提示选项（选中时不触发切换）
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "";
+      defaultOption.textContent = "请选择工作表";
+      defaultOption.selected = true;
+      sheetSelect.appendChild(defaultOption);
+
       sheetNames.forEach((name, index) => {
         const option = document.createElement("option");
         option.value = name;
@@ -1517,3 +1524,144 @@ function loadScript(src) {
     document.head.appendChild(script);
   });
 }
+
+// 显示Sheet数据预览
+function showSheetPreview() {
+  if (!workbook) {
+    showToast("请先上传Excel文件", "warning");
+    return;
+  }
+
+  if (!currentSheet) {
+    showToast("请先选择工作表", "warning");
+    return;
+  }
+
+  try {
+    const worksheet = workbook.Sheets[currentSheet];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    if (!jsonData || jsonData.length === 0) {
+      showToast("工作表没有数据", "warning");
+      return;
+    }
+
+    const modal = document.getElementById("previewModal");
+    const modalContent = document.getElementById("previewModal-content");
+
+    // 清空之前的内容
+    modalContent.innerHTML = "";
+
+    // 创建表格容器
+    const tableContainer = document.createElement("div");
+    tableContainer.style.cssText = `
+      overflow-x: auto;
+      border: 1px solid #e8e8e8;
+      border-radius: 6px;
+    `;
+
+    // 创建表格
+    const table = document.createElement("table");
+    table.style.cssText = `
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    `;
+
+    // 添加表头和数据行
+    const maxRows = Math.min(jsonData.length, 101); // 最多显示100行数据 + 1行表头
+
+    for (let i = 0; i < maxRows; i++) {
+      const row = jsonData[i];
+      if (!row) continue;
+
+      const tr = document.createElement("tr");
+
+      // 表头样式
+      if (i === 0) {
+        tr.style.cssText = `
+          background: #f5f5f5;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        `;
+      }
+
+      const maxCols = Math.min(row.length, 20); // 最多显示20列
+
+      for (let j = 0; j < maxCols; j++) {
+        const cell = document.createElement(i === 0 ? "th" : "td");
+        const cellValue = sanitizeText(row[j] || "");
+
+        cell.textContent = cellValue;
+        cell.style.cssText = `
+          padding: 10px 12px;
+          border: 1px solid #e8e8e8;
+          text-align: left;
+          ${i === 0 ? "font-weight: 600; color: #262626;" : "color: #595959;"}
+          ${i > 0 && j === 0 ? "background: #fafafa;" : ""}
+          white-space: nowrap;
+          max-width: 300px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        `;
+
+        tr.appendChild(cell);
+      }
+
+      table.appendChild(tr);
+    }
+
+    tableContainer.appendChild(table);
+    modalContent.appendChild(tableContainer);
+
+    // 添加数据统计信息
+    if (jsonData.length > 101) {
+      const infoDiv = document.createElement("div");
+      infoDiv.style.cssText = `
+        margin-top: 16px;
+        padding: 12px;
+        background: #e6f7ff;
+        border: 1px solid #91d5ff;
+        border-radius: 4px;
+        color: #0050b3;
+        font-size: 13px;
+      `;
+      infoDiv.textContent = `⚠️ 数据较多，当前仅显示前100行（总计 ${jsonData.length - 1} 行数据）`;
+      modalContent.appendChild(infoDiv);
+    }
+
+    const statsDiv = document.createElement("div");
+    statsDiv.style.cssText = `
+      margin-top: 12px;
+      padding: 12px;
+      background: #f6ffed;
+      border: 1px solid #b7eb8f;
+      border-radius: 4px;
+      color: #389e0d;
+      font-size: 13px;
+    `;
+    statsDiv.textContent = `📊 统计: ${jsonData.length - 1} 行数据 × ${Math.min(jsonData[0]?.length || 0, 20)} 列`;
+    modalContent.appendChild(statsDiv);
+
+    // 显示modal
+    modal.style.display = "flex";
+  } catch (error) {
+    console.error("预览数据失败:", error);
+    showToast("预览数据失败", "error");
+  }
+}
+
+// 关闭预览modal
+function closePreviewModal() {
+  const modal = document.getElementById("previewModal");
+  modal.style.display = "none";
+}
+
+// 点击预览modal外部区域关闭
+document.addEventListener("click", function (event) {
+  const previewModal = document.getElementById("previewModal");
+  if (event.target === previewModal) {
+    closePreviewModal();
+  }
+});

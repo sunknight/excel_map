@@ -335,9 +335,18 @@
                 transition: stroke 0.2s, opacity 0.2s;
             }
 
+            /* 添加不可见的粗线条用于扩大点击范围 */
+            .connection-hitbox {
+                stroke: transparent;
+                stroke-width: 8;
+                fill: none;
+                pointer-events: stroke;
+                cursor: pointer;
+            }
+
             .connection:hover {
                 stroke: #5A7BD3;
-                stroke-width: 3;
+                stroke-width: 2;
                 opacity: 1;
             }
 

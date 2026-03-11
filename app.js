@@ -865,14 +865,33 @@ function renderConnections() {
     path.setAttribute("d", d);
     path.setAttribute("class", "connection");
 
-    // 添加点击事件，定位到子节点
-    path.style.cursor = "pointer";
-    path.addEventListener("click", (e) => {
+    // 创建不可见的 hitbox 用于扩大点击范围
+    const hitbox = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "path",
+    );
+    hitbox.setAttribute("d", d);
+    hitbox.setAttribute("class", "connection-hitbox");
+
+    // 添加点击事件到 hitbox，定位到子节点
+    hitbox.addEventListener("click", (e) => {
       e.stopPropagation();
       focusOnNode(node.id);
     });
 
+    // 添加悬停效果到可见线条
+    path.addEventListener("mouseenter", () => {
+      path.setAttribute("stroke", "#5A7BD3");
+      path.setAttribute("opacity", "1");
+    });
+
+    path.addEventListener("mouseleave", () => {
+      path.setAttribute("stroke", "#bfbfbf");
+      path.setAttribute("opacity", "0.6");
+    });
+
     svg.appendChild(path);
+    svg.appendChild(hitbox);
   });
 }
 

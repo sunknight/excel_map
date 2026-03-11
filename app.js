@@ -537,6 +537,9 @@ function renderMindmap() {
 
   // 自动布局
   autoLayout();
+
+  // 定位到根节点
+  focusOnRootNode();
 }
 
 // 创建节点 - 修复版本，确保正确的节点顺序
@@ -806,6 +809,14 @@ function renderConnections() {
 
     path.setAttribute("d", d);
     path.setAttribute("class", "connection");
+
+    // 添加点击事件，定位到子节点
+    path.style.cursor = "pointer";
+    path.addEventListener("click", (e) => {
+      e.stopPropagation();
+      focusOnNode(node.id);
+    });
+
     svg.appendChild(path);
   });
 }
@@ -1039,6 +1050,89 @@ function resetLayout() {
   panX = 0;
   panY = 0;
   autoLayout();
+  // 定位到根节点
+  focusOnRootNode();
+}
+
+// 定位到根节点（左侧30%，垂直居中）
+function focusOnRootNode() {
+  if (nodes.length === 0) return;
+  focusOnNode(nodes[0].id);
+}
+
+// 定位到指定节点（左侧30%，垂直居中）
+function focusOnNode(nodeId) {
+  if (nodes.length === 0) return;
+
+  // 等待DOM渲染完成
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const targetNode = nodes[nodeId];
+      const targetElement = document.getElementById(`node-${nodeId}`);
+
+      if (targetElement) {
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        // 获取目标节点的位置和尺寸（相对于画布）
+        const nodeX = targetNode.x;
+        const nodeY = targetNode.y;
+        const nodeWidth = targetElement.offsetWidth;
+        const nodeHeight = targetElement.offsetHeight;
+
+        // 目标位置：节点中心在屏幕左侧30%，垂直居中
+        const targetX = viewportWidth * 0.3; // 屏幕宽度的30%
+        const targetY = viewportHeight / 2; // 垂直居中
+
+        // 计算需要的平移量
+        const newPanX = targetX - (nodeX + nodeWidth / 2) * scale;
+        const newPanY = targetY - (nodeY + nodeHeight / 2) * scale;
+
+        // 使用动画过渡到新位置
+        animatePanTo(newPanX, newPanY);
+
+        // 高亮显示目标节点
+        targetElement.style.boxShadow = "0 0 0 3px rgba(90, 123, 211, 0.5)";
+        setTimeout(() => {
+          targetElement.style.boxShadow = "";
+        }, 500);
+      }
+    });
+  });
+}
+
+// 平滑动画到指定位置
+function animatePanTo(targetPanX, targetPanY, duration = 300) {
+  const startPanX = panX;
+  const startPanY = panY;
+  const startTime = performance.now();
+
+  // 添加 CSS 过渡效果
+  canvas.style.transition = `transform ${duration}ms ease-out`;
+
+  function animate(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // 使用 ease-out 缓动函数
+    const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+    panX = startPanX + (targetPanX - startPanX) * easeProgress;
+    panY = startPanY + (targetPanY - startPanY) * easeProgress;
+
+    updateCanvasTransform();
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      // 动画完成后移除过渡效果，避免影响其他操作
+      setTimeout(() => {
+        canvas.style.transition = "";
+      }, 50);
+    }
+  }
+
+  requestAnimationFrame(animate);
 }
 
 // 切换节点展开/折叠状态
@@ -1118,6 +1212,8 @@ function collapseAll() {
     }
   });
   autoLayout();
+  // 定位到根节点
+  focusOnRootNode();
 }
 
 // 适应屏幕

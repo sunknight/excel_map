@@ -194,6 +194,12 @@
                 overflow: visible;
             }
 
+            /* 连接线可以接收鼠标事件 */
+            svg.connections .connection {
+                pointer-events: stroke;
+                cursor: pointer;
+            }
+
             .node {
                 position: absolute;
                 background: #ffffff;
@@ -305,10 +311,14 @@
                 stroke-width: 2;
                 fill: none;
                 opacity: 0.6;
+                pointer-events: stroke;
+                cursor: pointer;
+                transition: stroke 0.2s, opacity 0.2s;
             }
 
             .connection:hover {
-                stroke: #8c8c8c;
+                stroke: #5A7BD3;
+                stroke-width: 3;
                 opacity: 1;
             }
 

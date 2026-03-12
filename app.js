@@ -886,7 +886,7 @@ function createNodes(data, level, parentId) {
 }
 
 // 自动布局 - 使用改进的树形布局算法，确保不重叠
-function autoLayout(skipUpdateTransform = false) {
+function autoLayout(skipUpdateTransform = false, preserveLayout = false) {
   if (!mindmapData || nodes.length === 0) return;
 
   const NODE_WIDTH = 220;
@@ -937,21 +937,29 @@ function autoLayout(skipUpdateTransform = false) {
   }
 
   // 第一步：计算每个节点的子树所需的总高度
-  function calculateSubtreeSize(nodeId) {
+  // preserveLayout: 为单个节点切换时保持布局，使用完整展开时的高度
+  function calculateSubtreeSize(nodeId, preserveLayout = false) {
     const node = nodes[nodeId];
     const nodeHeight = getNodeHeight(node);
 
-    if (!node.expanded || node.children.length === 0) {
-      // 叶子节点或折叠的节点
+    if (!preserveLayout && (!node.expanded || node.children.length === 0)) {
+      // 正常模式：折叠的节点或叶子节点，只使用自身高度
       node.subtreeHeight = nodeHeight;
       return nodeHeight;
     }
 
-    // 展开的节点：计算所有子节点的高度总和
+    if (preserveLayout && node.children.length === 0) {
+      // 保持布局模式：叶子节点
+      node.subtreeHeight = nodeHeight;
+      return nodeHeight;
+    }
+
+    // 计算所有子节点的高度总和
+    // 在preserveLayout模式下，无论折叠状态都计算完整子树
     let totalHeight = 0;
     const verticalGap = getVerticalGap(node);
     for (let i = 0; i < node.children.length; i++) {
-      const childHeight = calculateSubtreeSize(node.children[i]);
+      const childHeight = calculateSubtreeSize(node.children[i], preserveLayout);
       totalHeight += childHeight;
       if (i < node.children.length - 1) {
         totalHeight += verticalGap;
@@ -994,47 +1002,36 @@ function autoLayout(skipUpdateTransform = false) {
     node.x = xOffset;
 
     // 设置Y坐标
-    // 关键修复：无论展开还是折叠，都使用相同的位置计算逻辑
-    // 这确保节点在折叠/展开时不会移动
-    if (node.children.length === 0) {
-      // 没有子节点的叶子节点：直接使用startY
+    if (!node.expanded || node.children.length === 0) {
+      // 折叠的节点或叶子节点：直接使用startY
       node.y = startY;
     } else {
-      // 有子节点的节点：先计算子节点的位置，然后根据子节点位置计算父节点位置
-      // 即使折叠状态也要计算，以确保位置一致
+      // 展开且有子节点的节点：先布局子节点，然后根据子节点位置计算父节点位置
       let currentY = startY;
       const verticalGap = getVerticalGap(node);
 
-      // 计算所有子节点的位置（即使折叠状态）
-      const childPositions = [];
+      // 递归布局所有子节点
       for (let i = 0; i < node.children.length; i++) {
         const childId = node.children[i];
         const child = nodes[childId];
         const childHeight = child.subtreeHeight;
 
-        // 记录子节点的Y位置
-        childPositions.push(currentY);
+        // 布局子节点
+        layoutNode(childId, depth + 1, currentY);
 
         currentY += childHeight + verticalGap;
       }
 
-      // 只有在展开状态下才实际布局子节点
-      if (node.expanded) {
-        for (let i = 0; i < node.children.length; i++) {
-          layoutNode(node.children[i], depth + 1, childPositions[i]);
-        }
-      }
-
-      // 根据子节点位置计算父节点位置（无论展开还是折叠）
+      // 根据子节点位置计算父节点位置（居中）
       const firstChildId = node.children[0];
       const firstChild = nodes[firstChildId];
       const firstChildNodeHeight = getNodeHeight(firstChild);
-      const firstChildCenter = childPositions[0] + firstChildNodeHeight / 2;
+      const firstChildCenter = firstChild.y + firstChildNodeHeight / 2;
 
       const lastChildId = node.children[node.children.length - 1];
       const lastChild = nodes[lastChildId];
       const lastChildNodeHeight = getNodeHeight(lastChild);
-      const lastChildCenter = childPositions[childPositions.length - 1] + lastChildNodeHeight / 2;
+      const lastChildCenter = lastChild.y + lastChildNodeHeight / 2;
 
       // 父节点中心 = 第一个子节点中心 + (最后一个子节点中心 - 第一个子节点中心) / 2
       node.y = (firstChildCenter + lastChildCenter) / 2 - nodeHeight / 2;
@@ -1042,7 +1039,7 @@ function autoLayout(skipUpdateTransform = false) {
   }
 
   // 执行布局
-  const totalHeight = calculateSubtreeSize(0);
+  const totalHeight = calculateSubtreeSize(0, preserveLayout);
 
   // 计算起始Y坐标，使整个树垂直居中
   const viewportHeight = viewport.clientHeight;
@@ -1565,12 +1562,37 @@ function clearMindmapCanvas() {
 // 重置布局
 function resetLayout() {
   if (!mindmapData) return;
+
+  // 在重置之前，检查当前是否已经定位到根节点附近
+  let shouldAnimate = true;
+  if (nodes.length > 0) {
+    const rootElement = document.getElementById(`node-${nodes[0].id}`);
+    if (rootElement) {
+      const rootNode = nodes[0];
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // 计算根节点的目标位置
+      const targetX = viewportWidth * 0.3;
+      const targetY = viewportHeight / 2;
+      const nodeWidth = rootElement.offsetWidth;
+      const nodeHeight = rootElement.offsetHeight;
+
+      const targetPanX = targetX - (rootNode.x + nodeWidth / 2) * scale;
+      const targetPanY = targetY - (rootNode.y + nodeHeight / 2) * scale;
+
+      // 如果当前位置与目标位置的距离小于阈值，不使用动画
+      const distance = Math.sqrt(Math.pow(panX - targetPanX, 2) + Math.pow(panY - targetPanY, 2));
+      shouldAnimate = distance > 10;
+    }
+  }
+
   scale = 0.7; // 重置时也使用0.7的缩放级别
   panX = 0;
   panY = 0;
   autoLayout();
-  // 定位到根节点
-  focusOnRootNode();
+  // 定位到根节点（智能判断是否需要动画）
+  focusOnNode(nodes[0].id, shouldAnimate);
 }
 
 // 定位到根节点（左侧30%，垂直居中）
@@ -1607,8 +1629,12 @@ function focusOnNode(nodeId, animate = true) {
         const newPanX = targetX - (nodeX + nodeWidth / 2) * scale;
         const newPanY = targetY - (nodeY + nodeHeight / 2) * scale;
 
+        // 智能判断是否需要动画：如果当前位置与目标位置很近，不使用动画
+        const distance = Math.sqrt(Math.pow(panX - newPanX, 2) + Math.pow(panY - newPanY, 2));
+        const shouldAnimate = animate && distance > 10; // 距离大于10px才使用动画
+
         // 使用动画过渡到新位置
-        if (animate) {
+        if (shouldAnimate) {
           animatePanTo(newPanX, newPanY);
         } else {
           // 不使用动画，直接设置位置
@@ -1702,8 +1728,8 @@ function toggleNode(nodeId) {
     }
   }
 
-  // 重新布局，但不更新画布变换
-  autoLayout(true);
+  // 重新布局，使用紧凑布局（根据实际折叠状态调整间距）
+  autoLayout(true, false);
 
   // 使用双重 requestAnimationFrame 确保 DOM 完全渲染后再获取新位置
   requestAnimationFrame(() => {

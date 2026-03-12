@@ -23,10 +23,18 @@ let fieldMapping = {
 
 // 默认字段名列表（支持多个可选字段名）
 const DEFAULT_FIELD_NAMES = {
-  level1: ["功能", "L1", "level1", "一级", "一级模块"],
-  level2: ["类型", "L2", "level2", "二级", "二级模块"],
-  level3: ["子功能", "L3", "level3", "三级", "三级模块", "用例类型"],
-  level4: ["标题", "用例名称", "L4", "level4", "四级"],
+  level1: ["功能", "L1", "level1", "一级", "一级模块", "状态"],
+  level2: ["类型", "L2", "level2", "二级", "二级模块", "优先级"],
+  level3: [
+    "子功能",
+    "L3",
+    "level3",
+    "三级",
+    "三级模块",
+    "用例类型",
+    "缺陷类型",
+  ],
+  level4: ["标题", "名称", "用例名称", "L4", "level4", "四级"],
   number: ["编号", "ID", "Number", "number"],
 };
 
@@ -1871,27 +1879,21 @@ function showSheetPreview() {
       document.getElementById("preview-fieldLevel5").value =
         window.selectedFields.level5 || "";
     } else {
-      // 尝试自动匹配默认字段
-      const defaultMappings = {
+      // 尝试自动匹配默认字段（使用 fieldMapping 中已经匹配好的字段）
+      const mappings = {
         "preview-fieldLevel1": fieldMapping.level1,
         "preview-fieldLevel2": fieldMapping.level2,
         "preview-fieldLevel3": fieldMapping.level3,
         "preview-fieldLevel4": fieldMapping.level4,
       };
 
-      Object.keys(defaultMappings).forEach((selectorId) => {
+      Object.keys(mappings).forEach((selectorId) => {
         const select = document.getElementById(selectorId);
-        const defaultFields = defaultMappings[selectorId];
+        const fieldName = mappings[selectorId];
 
-        // 查找匹配的字段
-        for (const field of defaultFields) {
-          const option = Array.from(select.options).find(
-            (opt) => opt.value === field,
-          );
-          if (option) {
-            select.value = field;
-            break;
-          }
+        // 如果字段已匹配，设置选择器的值
+        if (fieldName) {
+          select.value = fieldName;
         }
       });
     }

@@ -1563,33 +1563,33 @@ function clearMindmapCanvas() {
 function resetLayout() {
   if (!mindmapData) return;
 
-  // 在重置之前，检查当前是否已经定位到根节点附近
+  // 在重置之前，检查根节点是否已经在目标位置附近
   let shouldAnimate = true;
   if (nodes.length > 0) {
     const rootElement = document.getElementById(`node-${nodes[0].id}`);
     if (rootElement) {
-      const rootNode = nodes[0];
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
 
-      // 计算根节点的目标位置
+      // 获取根节点在屏幕上的当前位置
+      const currentRect = rootElement.getBoundingClientRect();
+      const currentCenterX = currentRect.left + currentRect.width / 2;
+      const currentCenterY = currentRect.top + currentRect.height / 2;
+
+      // 计算目标位置（屏幕左侧30%，垂直居中）
       const targetX = viewportWidth * 0.3;
       const targetY = viewportHeight / 2;
-      const nodeWidth = rootElement.offsetWidth;
-      const nodeHeight = rootElement.offsetHeight;
 
-      const targetPanX = targetX - (rootNode.x + nodeWidth / 2) * scale;
-      const targetPanY = targetY - (rootNode.y + nodeHeight / 2) * scale;
+      // 计算当前位置与目标位置的距离
+      const distance = Math.sqrt(Math.pow(currentCenterX - targetX, 2) + Math.pow(currentCenterY - targetY, 2));
 
-      // 如果当前位置与目标位置的距离小于阈值，不使用动画
-      const distance = Math.sqrt(Math.pow(panX - targetPanX, 2) + Math.pow(panY - targetPanY, 2));
+      // 如果距离小于阈值（10px），不需要动画
       shouldAnimate = distance > 10;
     }
   }
 
   scale = 0.7; // 重置时也使用0.7的缩放级别
-  panX = 0;
-  panY = 0;
+  // 不要立即设置 panX/panY，让 focusOnNode 来处理
   autoLayout();
   // 定位到根节点（智能判断是否需要动画）
   focusOnNode(nodes[0].id, shouldAnimate);

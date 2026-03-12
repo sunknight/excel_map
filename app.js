@@ -202,7 +202,7 @@ function handleCSVFile(csvText) {
   if (window.currentFileName) {
     const fileNameOption = document.createElement("option");
     fileNameOption.value = "";
-    fileNameOption.textContent = `📄 ${sanitizeText(window.currentFileName)}`;
+    fileNameOption.textContent = `📄 ${window.currentFileName}`; // 已在handleFileUpload中转义
     fileNameOption.disabled = true;
     fileNameOption.style.fontWeight = "bold";
     fileNameOption.style.color = "#2A4B8D";
@@ -342,7 +342,7 @@ function handleExcelFile(arrayBuffer) {
     if (window.currentFileName) {
       const fileNameOption = document.createElement("option");
       fileNameOption.value = "";
-      fileNameOption.textContent = `📄 ${sanitizeText(window.currentFileName)}`;
+      fileNameOption.textContent = `📄 ${window.currentFileName}`; // 已在handleFileUpload中转义
       fileNameOption.disabled = true;
       fileNameOption.style.fontWeight = "bold";
       fileNameOption.style.color = "#2A4B8D";
@@ -365,8 +365,8 @@ function handleExcelFile(arrayBuffer) {
 
     sheetNames.forEach((name, index) => {
       const option = document.createElement("option");
-      option.value = sanitizeText(name);
-      option.textContent = `📊 ${sanitizeText(name)}`;
+      option.value = name; // 保持原始值，用于获取worksheet
+      option.textContent = `📊 ${sanitizeText(name)}`; // 显示时转义
       sheetSelect.appendChild(option);
     });
 
@@ -378,7 +378,7 @@ function handleExcelFile(arrayBuffer) {
 
     // 如果只有一个工作表，自动选中
     if (sheetNames.length === 1) {
-      sheetSelect.value = sanitizeText(sheetNames[0]);
+      sheetSelect.value = sheetNames[0]; // 使用原始值，与option.value匹配
       // 触发切换工作表
       switchSheet();
     }
@@ -399,7 +399,7 @@ function switchSheet() {
   const sheetName = document.getElementById("sheetSelect").value;
   if (!sheetName || !workbook) return;
 
-  currentSheet = sanitizeText(sheetName); // 转义 Sheet 名称
+  currentSheet = sheetName; // 保持原始值
 
   try {
     const worksheet = workbook.Sheets[sheetName];
@@ -421,8 +421,8 @@ function switchSheet() {
       return;
     }
 
-    // 保存表头
-    sheetHeaders = jsonData[0];
+    // 保存表头（转义防止XSS）
+    sheetHeaders = jsonData[0].map(h => sanitizeText(h));
 
     // 自动填充字段选择器
     autoFillFieldSelectors();
@@ -506,8 +506,8 @@ function autoFillFieldSelectors() {
 
     sheetHeaders.forEach((header) => {
       const option = document.createElement("option");
-      option.value = sanitizeText(header);
-      option.textContent = sanitizeText(header);
+      option.value = header; // sheetHeaders已经转义过了
+      option.textContent = header; // sheetHeaders已经转义过了
       select.appendChild(option);
     });
   });
@@ -600,17 +600,20 @@ function parseExcelData(rawData) {
   const headers = rawData[0];
   const rows = rawData.slice(1);
 
+  // 转义所有表头（字段名）
+  const sanitizedHeaders = headers.map(h => sanitizeText(h));
+
   // 查找字段索引 - 使用用户选择的字段（未选择的为-1）
   const fieldMap = {
-    b1: fieldMapping.b1 ? headers.indexOf(fieldMapping.b1) : -1,
-    b2: fieldMapping.b2 ? headers.indexOf(fieldMapping.b2) : -1,
-    b3: fieldMapping.b3 ? headers.indexOf(fieldMapping.b3) : -1,
-    b4: fieldMapping.b4 ? headers.indexOf(fieldMapping.b4) : -1,
-    b5: fieldMapping.b5 ? headers.indexOf(fieldMapping.b5) : -1,
-    t: fieldMapping.t ? headers.indexOf(fieldMapping.t) : -1,
-    i1: fieldMapping.i1 ? headers.indexOf(fieldMapping.i1) : -1,
-    i2: fieldMapping.i2 ? headers.indexOf(fieldMapping.i2) : -1,
-    i3: fieldMapping.i3 ? headers.indexOf(fieldMapping.i3) : -1,
+    b1: fieldMapping.b1 ? sanitizedHeaders.indexOf(fieldMapping.b1) : -1,
+    b2: fieldMapping.b2 ? sanitizedHeaders.indexOf(fieldMapping.b2) : -1,
+    b3: fieldMapping.b3 ? sanitizedHeaders.indexOf(fieldMapping.b3) : -1,
+    b4: fieldMapping.b4 ? sanitizedHeaders.indexOf(fieldMapping.b4) : -1,
+    b5: fieldMapping.b5 ? sanitizedHeaders.indexOf(fieldMapping.b5) : -1,
+    t: fieldMapping.t ? sanitizedHeaders.indexOf(fieldMapping.t) : -1,
+    i1: fieldMapping.i1 ? sanitizedHeaders.indexOf(fieldMapping.i1) : -1,
+    i2: fieldMapping.i2 ? sanitizedHeaders.indexOf(fieldMapping.i2) : -1,
+    i3: fieldMapping.i3 ? sanitizedHeaders.indexOf(fieldMapping.i3) : -1,
   };
 
   // 提取数据 - 保存所有字段
@@ -630,12 +633,12 @@ function parseExcelData(rawData) {
         _i1: fieldMap.i1 >= 0 ? sanitizeText(row[fieldMap.i1]) : null,
         _i2: fieldMap.i2 >= 0 ? sanitizeText(row[fieldMap.i2]) : null,
         _i3: fieldMap.i3 >= 0 ? sanitizeText(row[fieldMap.i3]) : null,
-        _headers: headers,
+        _headers: sanitizedHeaders,
         _rawData: row,
       };
 
-      // 添加所有字段（也需要转义）
-      headers.forEach((header, idx) => {
+      // 添加所有字段（使用转义后的header作为key）
+      sanitizedHeaders.forEach((header, idx) => {
         if (!testCase.hasOwnProperty(header) && row[idx] !== undefined) {
           testCase[header] = sanitizeText(String(row[idx]));
         }
@@ -658,7 +661,7 @@ function generateMindmapData() {
 
   // 构建根节点
   mindmapData = {
-    name: currentSheet || "表格",
+    name: sanitizeText(currentSheet || "表格"), // 显示时转义
     level: 0,
     children: [],
   };
@@ -782,11 +785,11 @@ function createPageNode(testCase) {
 
   if (infoValues.length > 0) {
     node.children.push({
-      name: infoValues.join(" | "), // 多个信息字段用 " | " 分隔
+      name: infoValues.join(" | "), // 多个信息字段用 " | " 分隔（已在parseExcelData中转义）
       level: 11, // 信息节点使用层级11
       testCase: null,
       infoData: {
-        i1: testCase._i1,
+        i1: testCase._i1, // 已在parseExcelData中转义
         i2: testCase._i2,
         i3: testCase._i3,
       },
@@ -991,36 +994,47 @@ function autoLayout(skipUpdateTransform = false) {
     node.x = xOffset;
 
     // 设置Y坐标
-    if (!node.expanded || node.children.length === 0) {
-      // 叶子节点：直接使用startY
+    // 关键修复：无论展开还是折叠，都使用相同的位置计算逻辑
+    // 这确保节点在折叠/展开时不会移动
+    if (node.children.length === 0) {
+      // 没有子节点的叶子节点：直接使用startY
       node.y = startY;
     } else {
-      // 有子节点的节点：先布局子节点，然后根据子节点的实际位置计算父节点位置
+      // 有子节点的节点：先计算子节点的位置，然后根据子节点位置计算父节点位置
+      // 即使折叠状态也要计算，以确保位置一致
       let currentY = startY;
       const verticalGap = getVerticalGap(node);
 
-      // 先递归布局所有子节点
+      // 计算所有子节点的位置（即使折叠状态）
+      const childPositions = [];
       for (let i = 0; i < node.children.length; i++) {
         const childId = node.children[i];
         const child = nodes[childId];
         const childHeight = child.subtreeHeight;
 
-        // 布局子节点
-        layoutNode(childId, depth + 1, currentY);
+        // 记录子节点的Y位置
+        childPositions.push(currentY);
 
         currentY += childHeight + verticalGap;
       }
 
-      // 现在所有子节点都已经布局完成，可以获取它们的实际位置
+      // 只有在展开状态下才实际布局子节点
+      if (node.expanded) {
+        for (let i = 0; i < node.children.length; i++) {
+          layoutNode(node.children[i], depth + 1, childPositions[i]);
+        }
+      }
+
+      // 根据子节点位置计算父节点位置（无论展开还是折叠）
       const firstChildId = node.children[0];
       const firstChild = nodes[firstChildId];
       const firstChildNodeHeight = getNodeHeight(firstChild);
-      const firstChildCenter = firstChild.y + firstChildNodeHeight / 2;
+      const firstChildCenter = childPositions[0] + firstChildNodeHeight / 2;
 
       const lastChildId = node.children[node.children.length - 1];
       const lastChild = nodes[lastChildId];
       const lastChildNodeHeight = getNodeHeight(lastChild);
-      const lastChildCenter = lastChild.y + lastChildNodeHeight / 2;
+      const lastChildCenter = childPositions[childPositions.length - 1] + lastChildNodeHeight / 2;
 
       // 父节点中心 = 第一个子节点中心 + (最后一个子节点中心 - 第一个子节点中心) / 2
       node.y = (firstChildCenter + lastChildCenter) / 2 - nodeHeight / 2;
@@ -1161,25 +1175,38 @@ function createInfoTooltip(node, element) {
   const i2Name = fieldMapping.i2 || "I2";
   const i3Name = fieldMapping.i3 || "I3";
 
-  // 构建tooltip内容
+  // 构建tooltip内容 - 使用createElement和textContent防止XSS
+  // 注意：node.infoData中的值已在parseExcelData中转义，无需再次sanitize
   if (node.infoData.i1) {
     const item = document.createElement("div");
     item.className = "tooltip-item";
-    item.innerHTML = `<span class="tooltip-label">${sanitizeText(i1Name)}：</span>${sanitizeText(node.infoData.i1)}`;
+    const label = document.createElement("span");
+    label.className = "tooltip-label";
+    label.textContent = `${sanitizeText(i1Name)}：`;
+    item.appendChild(label);
+    item.appendChild(document.createTextNode(node.infoData.i1));
     tooltip.appendChild(item);
   }
 
   if (node.infoData.i2) {
     const item = document.createElement("div");
     item.className = "tooltip-item";
-    item.innerHTML = `<span class="tooltip-label">${sanitizeText(i2Name)}：</span>${sanitizeText(node.infoData.i2)}`;
+    const label = document.createElement("span");
+    label.className = "tooltip-label";
+    label.textContent = `${sanitizeText(i2Name)}：`;
+    item.appendChild(label);
+    item.appendChild(document.createTextNode(node.infoData.i2));
     tooltip.appendChild(item);
   }
 
   if (node.infoData.i3) {
     const item = document.createElement("div");
     item.className = "tooltip-item";
-    item.innerHTML = `<span class="tooltip-label">${sanitizeText(i3Name)}：</span>${sanitizeText(node.infoData.i3)}`;
+    const label = document.createElement("span");
+    label.className = "tooltip-label";
+    label.textContent = `${sanitizeText(i3Name)}：`;
+    item.appendChild(label);
+    item.appendChild(document.createTextNode(node.infoData.i3));
     tooltip.appendChild(item);
   }
 
@@ -1392,7 +1419,8 @@ function showTestCaseDetail(testCase) {
   const modalContent = document.getElementById("modal-content");
 
   // 使用用例名称作为标题 - 使用 textContent 防止 XSS
-  modalTitle.textContent = sanitizeText(testCase._level4 || "详情");
+  // 注意：testCase中的值已在parseExcelData中转义，无需再次sanitize
+  modalTitle.textContent = testCase._t || "详情";
 
   // 清空内容
   modalContent.innerHTML = "";
@@ -1412,13 +1440,14 @@ function showTestCaseDetail(testCase) {
 
   displayFields.forEach((key) => {
     const value = testCase[key];
-    const displayValue = sanitizeText(value || "未设置");
+    // 注意：testCase中的值已在parseExcelData中转义，无需再次sanitize
+    const displayValue = value || "未设置";
 
     // 创建标签行
     const labelDiv = document.createElement("div");
     labelDiv.style.cssText =
       "font-weight: 600; color: #262626; text-align: right; padding-top: 4px;";
-    labelDiv.textContent = sanitizeText(key);
+    labelDiv.textContent = key; // 字段名不需要转义
     contentDiv.appendChild(labelDiv);
 
     // 创建值行
@@ -2249,8 +2278,8 @@ function showSheetPreview() {
 
       sheetHeaders.forEach((header) => {
         const option = document.createElement("option");
-        option.value = sanitizeText(header);
-        option.textContent = sanitizeText(header);
+        option.value = header; // sheetHeaders已经转义过了
+        option.textContent = header; // sheetHeaders已经转义过了
         select.appendChild(option);
       });
     });

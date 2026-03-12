@@ -175,18 +175,8 @@ function handleFileUpload(event) {
 
 // 处理 CSV 文件
 function handleCSVFile(csvText) {
-  // 简单的 CSV 解析（支持逗号分隔）
-  const lines = csvText.split(/\r?\n/);
-  const data = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    // 简单的逗号分隔（暂不支持带逗号的引号内容）
-    const fields = line.split(",");
-    data.push(fields);
-  }
+  // 正确的 CSV 解析（支持引号内的换行、逗号和转义引号）
+  const data = parseCSVText(csvText);
 
   if (data.length < 2) {
     alert("CSV文件数据不足");
@@ -251,6 +241,83 @@ function handleCSVFile(csvText) {
   if (securityNotice) {
     securityNotice.style.display = "none";
   }
+}
+
+// 正确解析CSV文本（支持引号、换行、逗号）
+function parseCSVText(text) {
+  const rows = [];
+  let currentRow = [];
+  let currentField = "";
+  let inQuotes = false;
+  let i = 0;
+
+  while (i < text.length) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (inQuotes) {
+      // 在引号内
+      if (char === '"') {
+        if (nextChar === '"') {
+          // 转义的引号："" → "
+          currentField += '"';
+          i += 2;
+        } else {
+          // 引号结束
+          inQuotes = false;
+          i++;
+        }
+      } else {
+        // 引号内的普通字符（包括换行符）
+        currentField += char;
+        i++;
+      }
+    } else {
+      // 不在引号内
+      if (char === '"') {
+        // 引号开始
+        inQuotes = true;
+        i++;
+      } else if (char === ',') {
+        // 字段分隔符
+        currentRow.push(currentField.trim());
+        currentField = "";
+        i++;
+      } else if (char === '\r' && nextChar === '\n') {
+        // Windows换行符 \r\n
+        currentRow.push(currentField.trim());
+        if (currentRow.some(field => field !== "")) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        currentField = "";
+        i += 2;
+      } else if (char === '\n' || char === '\r') {
+        // Unix/Mac换行符
+        currentRow.push(currentField.trim());
+        if (currentRow.some(field => field !== "")) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        currentField = "";
+        i++;
+      } else {
+        // 普通字符
+        currentField += char;
+        i++;
+      }
+    }
+  }
+
+  // 处理最后一个字段和行
+  if (currentField !== "" || currentRow.length > 0) {
+    currentRow.push(currentField.trim());
+    if (currentRow.some(field => field !== "")) {
+      rows.push(currentRow);
+    }
+  }
+
+  return rows;
 }
 
 // 处理 Excel 文件
@@ -1142,14 +1209,14 @@ function renderConnections() {
     const connectionId = `connection-${parentNode.id}-${node.id}`;
 
     // 内联计算节点宽度和高度
-    const getNodeHeight = (n) => {
-      if (n.level >= 1 && n.level <= 5) return 70;
-      if (n.level === 10) return 40;
-      if (n.level === 11) return 24;
-      return 70;
-    };
-
     const getNodeWidth = (n) => {
+      // 优先使用节点的实际DOM宽度
+      const nodeElement = document.getElementById(`node-${n.id}`);
+      if (nodeElement) {
+        return nodeElement.offsetWidth;
+      }
+
+      // 降级方案：使用预设宽度
       if (n.level >= 1 && n.level <= 5) return 220;
       if (n.level === 10) return 600;
       if (n.level === 11) {
@@ -1157,6 +1224,20 @@ function renderConnections() {
         return textWidth + 32;
       }
       return 220;
+    };
+
+    const getNodeHeight = (n) => {
+      // 优先使用节点的实际DOM高度
+      const nodeElement = document.getElementById(`node-${n.id}`);
+      if (nodeElement) {
+        return nodeElement.offsetHeight;
+      }
+
+      // 降级方案：使用预设高度
+      if (n.level >= 1 && n.level <= 5) return 70;
+      if (n.level === 10) return 40;
+      if (n.level === 11) return 24;
+      return 70;
     };
 
     const startX = parentNode.x + getNodeWidth(parentNode);
@@ -1327,7 +1408,7 @@ function showTestCaseDetail(testCase) {
   // 创建内容容器
   const contentDiv = document.createElement("div");
   contentDiv.style.cssText =
-    "display: grid; grid-template-columns: 120px 1fr; gap: 12px 20px; font-size: 13px;";
+    "display: grid; grid-template-columns: 160px 1fr; gap: 12px 20px; font-size: 13px;";
 
   displayFields.forEach((key) => {
     const value = testCase[key];
@@ -1351,20 +1432,9 @@ function showTestCaseDetail(testCase) {
       priorityTag.textContent = displayValue;
       valueDiv.appendChild(priorityTag);
     } else {
-      // 判断是否需要保留换行
-      const needsPreWrap = [
-        "业务流程",
-        "前置条件",
-        "步骤描述",
-        "预期结果",
-        "备注",
-      ].includes(key);
-
-      if (needsPreWrap) {
-        valueDiv.style.whiteSpace = "pre-wrap";
-        valueDiv.style.wordBreak = "break-word";
-      }
-
+      // 对所有字段都保留换行符
+      valueDiv.style.whiteSpace = "pre-wrap";
+      valueDiv.style.wordBreak = "break-word";
       valueDiv.textContent = displayValue;
     }
 
@@ -1692,8 +1762,14 @@ function fitToScreen() {
     if (isVisible) {
       minX = Math.min(minX, node.x);
       minY = Math.min(minY, node.y);
-      maxX = Math.max(maxX, node.x + getNodeWidth(node));
-      maxY = Math.max(maxY, node.y + getNodeHeight(node));
+
+      // 获取节点的实际DOM尺寸
+      const nodeElement = document.getElementById(`node-${node.id}`);
+      const nodeWidth = nodeElement ? nodeElement.offsetWidth : 220;
+      const nodeHeight = nodeElement ? nodeElement.offsetHeight : 70;
+
+      maxX = Math.max(maxX, node.x + nodeWidth);
+      maxY = Math.max(maxY, node.y + nodeHeight);
     }
   });
 

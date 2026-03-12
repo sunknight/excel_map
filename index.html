@@ -733,7 +733,8 @@
                 style="
                     background: white;
                     border-radius: 8px;
-                    width: 600px;
+                    width: 900px;
+                    max-width: 90vw;
                     max-height: 80vh;
                     display: flex;
                     flex-direction: column;
@@ -1153,7 +1154,7 @@
                             枝节点（分类）- 可选1-5个
                         </label>
                         <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                            <div style="flex: 1; min-width: 140px;">
+                            <div style="flex: 0 0 calc(20% - 10px); min-width: 120px;">
                                 <label
                                     style="
                                         display: block;
@@ -1162,7 +1163,7 @@
                                         color: #595959;
                                     "
                                 >
-                                    B1:
+                                    分类1:
                                 </label>
                                 <select
                                     id="preview-b1"
@@ -1177,7 +1178,7 @@
                                     <option value="">请选择</option>
                                 </select>
                             </div>
-                            <div style="flex: 1; min-width: 140px;">
+                            <div style="flex: 0 0 calc(20% - 10px); min-width: 120px;">
                                 <label
                                     style="
                                         display: block;
@@ -1186,7 +1187,7 @@
                                         color: #595959;
                                     "
                                 >
-                                    B2:
+                                    分类2:
                                 </label>
                                 <select
                                     id="preview-b2"
@@ -1201,7 +1202,7 @@
                                     <option value="">请选择</option>
                                 </select>
                             </div>
-                            <div style="flex: 1; min-width: 140px;">
+                            <div style="flex: 0 0 calc(20% - 10px); min-width: 120px;">
                                 <label
                                     style="
                                         display: block;
@@ -1210,7 +1211,7 @@
                                         color: #595959;
                                     "
                                 >
-                                    B3:
+                                    分类3:
                                 </label>
                                 <select
                                     id="preview-b3"
@@ -1225,7 +1226,7 @@
                                     <option value="">请选择</option>
                                 </select>
                             </div>
-                            <div style="flex: 1; min-width: 140px;">
+                            <div style="flex: 0 0 calc(20% - 10px); min-width: 120px;">
                                 <label
                                     style="
                                         display: block;
@@ -1234,7 +1235,7 @@
                                         color: #595959;
                                     "
                                 >
-                                    B4:
+                                    分类4:
                                 </label>
                                 <select
                                     id="preview-b4"
@@ -1249,7 +1250,7 @@
                                     <option value="">请选择</option>
                                 </select>
                             </div>
-                            <div style="flex: 1; min-width: 140px;">
+                            <div style="flex: 0 0 calc(20% - 10px); min-width: 120px;">
                                 <label
                                     style="
                                         display: block;
@@ -1258,7 +1259,7 @@
                                         color: #595959;
                                     "
                                 >
-                                    B5:
+                                    分类5:
                                 </label>
                                 <select
                                     id="preview-b5"
@@ -1276,7 +1277,7 @@
                         </div>
                     </div>
 
-                    <!-- 页节点组 -->
+                    <!-- 叶节点组 -->
                     <div style="margin-bottom: 16px;">
                         <label
                             style="
@@ -1290,7 +1291,7 @@
                             叶节点（必选）
                         </label>
                         <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                            <div style="flex: 1; min-width: 200px;">
+                            <div style="flex: 0 0 calc(20% - 10px); min-width: 120px;">
                                 <select
                                     id="preview-t"
                                     style="
@@ -1321,7 +1322,7 @@
                             信息节点（附加信息）- 可选0-3个
                         </label>
                         <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                            <div style="flex: 1; min-width: 140px;">
+                            <div style="flex: 0 0 calc(20% - 10px); min-width: 120px;">
                                 <label
                                     style="
                                         display: block;
@@ -1330,7 +1331,7 @@
                                         color: #595959;
                                     "
                                 >
-                                    I1:
+                                    信息1:
                                 </label>
                                 <select
                                     id="preview-i1"
@@ -1345,7 +1346,7 @@
                                     <option value="">不显示</option>
                                 </select>
                             </div>
-                            <div style="flex: 1; min-width: 140px;">
+                            <div style="flex: 0 0 calc(20% - 10px); min-width: 120px;">
                                 <label
                                     style="
                                         display: block;
@@ -1354,7 +1355,7 @@
                                         color: #595959;
                                     "
                                 >
-                                    I2:
+                                    信息2:
                                 </label>
                                 <select
                                     id="preview-i2"
@@ -1369,7 +1370,7 @@
                                     <option value="">不显示</option>
                                 </select>
                             </div>
-                            <div style="flex: 1; min-width: 140px;">
+                            <div style="flex: 0 0 calc(20% - 10px); min-width: 120px;">
                                 <label
                                     style="
                                         display: block;
@@ -1378,7 +1379,7 @@
                                         color: #595959;
                                     "
                                 >
-                                    I3:
+                                    信息3:
                                 </label>
                                 <select
                                     id="preview-i3"
@@ -1393,24 +1394,29 @@
                                     <option value="">不显示</option>
                                 </select>
                             </div>
-                            <button
-                                onclick="generateMindmapFromPreview()"
-                                style="
-                                    padding: 8px 20px;
-                                    border: none;
-                                    border-radius: 4px;
-                                    background: #5A7BD3;
-                                    color: white;
-                                    cursor: pointer;
-                                    font-size: 14px;
-                                    font-weight: 500;
-                                    height: 32px;
-                                    white-space: nowrap;
-                                "
-                            >
-                                生成脑图
-                            </button>
                         </div>
+                    </div>
+
+                    <!-- 生成脑图按钮 -->
+                    <div style="margin-top: 20px;">
+                        <button
+                            onclick="generateMindmapFromPreview()"
+                            style="
+                                padding: 10px 24px;
+                                border: none;
+                                border-radius: 4px;
+                                background: #5A7BD3;
+                                color: white;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: background 0.2s;
+                            "
+                            onmouseover="this.style.background='#4A6BC3'"
+                            onmouseout="this.style.background='#5A7BD3'"
+                        >
+                            生成脑图
+                        </button>
                     </div>
                 </div>
 

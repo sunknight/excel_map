@@ -174,6 +174,12 @@ function handleFileUpload(event) {
       if (sheetSelector) {
         sheetSelector.classList.add("active");
       }
+
+      // 隐藏安全提示
+      const securityNotice = document.getElementById("securityNotice");
+      if (securityNotice) {
+        securityNotice.style.display = "none";
+      }
     } catch (error) {
       console.error("解析Excel文件失败:", error);
       alert("解析Excel文件失败，请检查文件格式");
@@ -1101,6 +1107,12 @@ function clearMindmap() {
   document.getElementById("fitBtn").disabled = true;
   document.getElementById("copyBtn").disabled = true;
   document.getElementById("downloadBtn").disabled = true;
+
+  // 显示安全提示
+  const securityNotice = document.getElementById("securityNotice");
+  if (securityNotice) {
+    securityNotice.style.display = "";
+  }
 }
 
 // 清空脑图画布（保留文件和 workbook）

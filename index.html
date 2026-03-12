@@ -131,6 +131,13 @@
                 background: #4a6ab8;
             }
 
+            .security-notice {
+                margin-left: 12px;
+                color: #8c8c8c;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+
             .controls {
                 display: flex;
                 gap: 6px;
@@ -596,6 +603,9 @@
                         >
                             📁 上传Excel文件
                         </button>
+                        <span id="securityNotice" class="security-notice">
+                            文档仅在浏览器内处理，不会上传任何服务器
+                        </span>
                     </div>
                 </div>
                 <div class="sheet-section" id="sheetSelector">

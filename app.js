@@ -183,6 +183,13 @@ function handleFileUpload(event) {
         sheetSelector.classList.add("active");
       }
 
+      // 如果只有一个工作表，自动选中
+      if (sheetNames.length === 1) {
+        sheetSelect.value = sanitizeText(sheetNames[0]);
+        // 触发切换工作表
+        switchSheet();
+      }
+
       // 隐藏安全提示
       const securityNotice = document.getElementById("securityNotice");
       if (securityNotice) {
@@ -930,8 +937,17 @@ function getNodeWidth(node) {
   return 220; // 默认宽度
 }
 
-// 获取节点高度
+// 获取节点高度（用于连接线渲染）
 function getNodeHeight(node) {
+  // 对于 L4 和 L5 节点，使用与 autoLayout 中相同的高度计算
+  if (node.level === 4) {
+    return 40; // 用例节点高度（与 autoLayout 中的值一致）
+  }
+  if (node.level === 5) {
+    return 24; // 附加信息节点高度（与 autoLayout 中的值一致）
+  }
+
+  // 其他节点：读取实际 DOM 高度
   const nodeElement = document.getElementById(`node-${node.id}`);
   if (nodeElement) {
     return nodeElement.offsetHeight;

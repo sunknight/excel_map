@@ -14,19 +14,34 @@ let workbook = null;
 let currentSheet = null;
 let sheetHeaders = []; // 存储当前sheet的表头
 let fieldMapping = {
-  level1: "",
-  level2: "",
-  level3: "",
-  level4: "",
-  number: "",
-}; // 默认字段映射
+  b1: "",
+  b2: "",
+  b3: "",
+  b4: "",
+  b5: "",
+  t: "",
+  i1: "",
+  i2: "",
+  i3: "",
+}; // 默认字段映射（枝节点B1-B5、叶节点T、信息节点I1-I3）
 
 // 默认字段名列表（支持多个可选字段名）
 const DEFAULT_FIELD_NAMES = {
-  level1: ["功能", "L1", "level1", "一级", "一级模块", "状态"],
-  level2: ["类型", "L2", "level2", "二级", "二级模块", "优先级"],
-  level3: [
+  // 枝节点（B1-B5）：分类节点，支持1-5级
+  b1: ["功能", "模块", "L1", "level1", "一级", "一级模块", "分类", "状态"],
+  b2: [
+    "类型",
+    "子模块",
+    "L2",
+    "level2",
+    "二级",
+    "二级模块",
+    "子分类",
+    "优先级",
+  ],
+  b3: [
     "子功能",
+    "子类型",
     "L3",
     "level3",
     "三级",
@@ -34,8 +49,14 @@ const DEFAULT_FIELD_NAMES = {
     "用例类型",
     "缺陷类型",
   ],
-  level4: ["标题", "名称", "用例名称", "L4", "level4", "四级"],
-  number: ["编号", "ID", "Number", "number"],
+  b4: ["子功能2", "L4", "level4", "四级", "四级模块"],
+  b5: ["子功能3", "L5", "level5", "五级", "五级模块"],
+  // 叶节点（T）：叶子节点，必选
+  t: ["标题", "名称", "用例名称", "主题", "页", "page", "title"],
+  // 信息节点（I1-I3）：附加信息，可选0-3个
+  i1: ["备注", "说明", "描述", "附加信息", "remark", "description", "comment"],
+  i2: ["优先级", "priority", "重要级", "紧急程度", "severity"],
+  i3: ["status", "进度", "完成情况", "result"],
 };
 
 const viewport = document.getElementById("viewport");
@@ -112,7 +133,7 @@ function showToast(message, type = "info") {
   }, 3000);
 }
 
-// Excel文件上传处理
+// 文件上传处理（支持 Excel 和 CSV）
 document
   .getElementById("fileInput")
   .addEventListener("change", handleFileUpload);
@@ -130,77 +151,180 @@ function handleFileUpload(event) {
   const reader = new FileReader();
   reader.onload = function (e) {
     try {
-      const data = new Uint8Array(e.target.result);
-      workbook = XLSX.read(data, { type: "array" });
+      const fileExtension = file.name.split(".").pop().toLowerCase();
 
-      // 获取所有工作表名称
-      const sheetNames = workbook.SheetNames;
-
-      if (sheetNames.length === 0) {
-        alert("Excel文件中没有工作表");
-        return;
-      }
-
-      // 填充Sheet选择器，包含文件名
-      const sheetSelect = document.getElementById("sheetSelect");
-      sheetSelect.innerHTML = "";
-
-      // 添加文件名选项（不可选，仅显示）
-      if (window.currentFileName) {
-        const fileNameOption = document.createElement("option");
-        fileNameOption.value = "";
-        fileNameOption.textContent = `📄 ${sanitizeText(window.currentFileName)}`;
-        fileNameOption.disabled = true;
-        fileNameOption.style.fontWeight = "bold";
-        fileNameOption.style.color = "#2A4B8D";
-        sheetSelect.appendChild(fileNameOption);
-      }
-
-      // 添加分隔线和选择提示
-      const separatorOption = document.createElement("option");
-      separatorOption.value = "";
-      separatorOption.textContent = "─ 选择工作表 ─";
-      separatorOption.disabled = true;
-      sheetSelect.appendChild(separatorOption);
-
-      // 添加默认提示选项（选中时不触发切换）
-      const defaultOption = document.createElement("option");
-      defaultOption.value = "";
-      defaultOption.textContent = "请选择工作表";
-      defaultOption.selected = true;
-      sheetSelect.appendChild(defaultOption);
-
-      sheetNames.forEach((name, index) => {
-        const option = document.createElement("option");
-        option.value = sanitizeText(name);
-        option.textContent = `📊 ${sanitizeText(name)}`;
-        sheetSelect.appendChild(option);
-      });
-
-      // 显示Sheet选择器
-      const sheetSelector = document.getElementById("sheetSelector");
-      if (sheetSelector) {
-        sheetSelector.classList.add("active");
-      }
-
-      // 如果只有一个工作表，自动选中
-      if (sheetNames.length === 1) {
-        sheetSelect.value = sanitizeText(sheetNames[0]);
-        // 触发切换工作表
-        switchSheet();
-      }
-
-      // 隐藏安全提示
-      const securityNotice = document.getElementById("securityNotice");
-      if (securityNotice) {
-        securityNotice.style.display = "none";
+      if (fileExtension === "csv") {
+        // 处理 CSV 文件
+        handleCSVFile(e.target.result);
+      } else {
+        // 处理 Excel 文件
+        handleExcelFile(e.target.result);
       }
     } catch (error) {
-      console.error("解析Excel文件失败:", error);
-      alert("解析Excel文件失败，请检查文件格式");
+      console.error("解析文件失败:", error);
+      alert("解析文件失败，请检查文件格式");
     }
   };
-  reader.readAsArrayBuffer(file);
+
+  if (file.name.endsWith(".csv")) {
+    reader.readAsText(file, "UTF-8");
+  } else {
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+// 处理 CSV 文件
+function handleCSVFile(csvText) {
+  // 简单的 CSV 解析（支持逗号分隔）
+  const lines = csvText.split(/\r?\n/);
+  const data = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // 简单的逗号分隔（暂不支持带逗号的引号内容）
+    const fields = line.split(",");
+    data.push(fields);
+  }
+
+  if (data.length < 2) {
+    alert("CSV文件数据不足");
+    return;
+  }
+
+  // 将 CSV 数据转换为类似 Excel 的格式
+  // CSV 只有一个 "Sheet"
+  workbook = {
+    SheetNames: ["Sheet1"],
+    Sheets: {
+      Sheet1: {
+        CSV: true,
+        data: data,
+      },
+    },
+  };
+
+  // 填充Sheet选择器
+  const sheetSelect = document.getElementById("sheetSelect");
+  sheetSelect.innerHTML = "";
+
+  if (window.currentFileName) {
+    const fileNameOption = document.createElement("option");
+    fileNameOption.value = "";
+    fileNameOption.textContent = `📄 ${sanitizeText(window.currentFileName)}`;
+    fileNameOption.disabled = true;
+    fileNameOption.style.fontWeight = "bold";
+    fileNameOption.style.color = "#2A4B8D";
+    sheetSelect.appendChild(fileNameOption);
+  }
+
+  const separatorOption = document.createElement("option");
+  separatorOption.value = "";
+  separatorOption.textContent = "─ 选择工作表 ─";
+  separatorOption.disabled = true;
+  sheetSelect.appendChild(separatorOption);
+
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "请选择工作表";
+  defaultOption.selected = true;
+  sheetSelect.appendChild(defaultOption);
+
+  const option = document.createElement("option");
+  option.value = "Sheet1";
+  option.textContent = "📊 Sheet1";
+  sheetSelect.appendChild(option);
+
+  // 显示Sheet选择器
+  const sheetSelector = document.getElementById("sheetSelector");
+  if (sheetSelector) {
+    sheetSelector.classList.add("active");
+  }
+
+  // 自动选中唯一的 sheet
+  sheetSelect.value = "Sheet1";
+  switchSheet();
+
+  // 隐藏安全提示
+  const securityNotice = document.getElementById("securityNotice");
+  if (securityNotice) {
+    securityNotice.style.display = "none";
+  }
+}
+
+// 处理 Excel 文件
+function handleExcelFile(arrayBuffer) {
+  try {
+    const data = new Uint8Array(arrayBuffer);
+    workbook = XLSX.read(data, { type: "array" });
+
+    // 获取所有工作表名称
+    const sheetNames = workbook.SheetNames;
+
+    if (sheetNames.length === 0) {
+      alert("Excel文件中没有工作表");
+      return;
+    }
+
+    // 填充Sheet选择器，包含文件名
+    const sheetSelect = document.getElementById("sheetSelect");
+    sheetSelect.innerHTML = "";
+
+    // 添加文件名选项（不可选，仅显示）
+    if (window.currentFileName) {
+      const fileNameOption = document.createElement("option");
+      fileNameOption.value = "";
+      fileNameOption.textContent = `📄 ${sanitizeText(window.currentFileName)}`;
+      fileNameOption.disabled = true;
+      fileNameOption.style.fontWeight = "bold";
+      fileNameOption.style.color = "#2A4B8D";
+      sheetSelect.appendChild(fileNameOption);
+    }
+
+    // 添加分隔线和选择提示
+    const separatorOption = document.createElement("option");
+    separatorOption.value = "";
+    separatorOption.textContent = "─ 选择工作表 ─";
+    separatorOption.disabled = true;
+    sheetSelect.appendChild(separatorOption);
+
+    // 添加默认提示选项（选中时不触发切换）
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = "请选择工作表";
+    defaultOption.selected = true;
+    sheetSelect.appendChild(defaultOption);
+
+    sheetNames.forEach((name, index) => {
+      const option = document.createElement("option");
+      option.value = sanitizeText(name);
+      option.textContent = `📊 ${sanitizeText(name)}`;
+      sheetSelect.appendChild(option);
+    });
+
+    // 显示Sheet选择器
+    const sheetSelector = document.getElementById("sheetSelector");
+    if (sheetSelector) {
+      sheetSelector.classList.add("active");
+    }
+
+    // 如果只有一个工作表，自动选中
+    if (sheetNames.length === 1) {
+      sheetSelect.value = sanitizeText(sheetNames[0]);
+      // 触发切换工作表
+      switchSheet();
+    }
+
+    // 隐藏安全提示
+    const securityNotice = document.getElementById("securityNotice");
+    if (securityNotice) {
+      securityNotice.style.display = "none";
+    }
+  } catch (error) {
+    console.error("解析Excel文件失败:", error);
+    alert("解析Excel文件失败，请检查文件格式");
+  }
 }
 
 // 切换工作表
@@ -212,7 +336,16 @@ function switchSheet() {
 
   try {
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    let jsonData;
+
+    // 检查是否是 CSV 数据
+    if (worksheet.CSV) {
+      // CSV 数据已经在 handleCSVFile 中解析好了
+      jsonData = worksheet.data;
+    } else {
+      // Excel 数据，使用 XLSX 解析
+      jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    }
 
     if (jsonData.length < 2) {
       console.warn("工作表数据不足");
@@ -248,8 +381,8 @@ function switchSheet() {
 function autoMatchFields() {
   let matched = true;
 
-  // 必需字段：level1 和 level4
-  const requiredFields = ["level1", "level4"];
+  // 必需字段：至少一个枝节点（b1）和叶节点（t）
+  const requiredFields = ["b1", "t"];
 
   // 匹配每个字段
   Object.keys(DEFAULT_FIELD_NAMES).forEach((fieldKey) => {
@@ -258,13 +391,6 @@ function autoMatchFields() {
 
     if (found) {
       fieldMapping[fieldKey] = found;
-      // 更新下拉选择器
-      const selectId =
-        "field" + fieldKey.charAt(0).toUpperCase() + fieldKey.slice(1);
-      const select = document.getElementById(selectId);
-      if (select) {
-        select.value = found;
-      }
     } else if (requiredFields.includes(fieldKey)) {
       // 必需字段未找到
       matched = false;
@@ -274,12 +400,15 @@ function autoMatchFields() {
   // 同步到 window.selectedFields，以便预览时显示当前字段
   if (matched) {
     window.selectedFields = {
-      level1: fieldMapping.level1 || "",
-      level2: fieldMapping.level2 || "",
-      level3: fieldMapping.level3 || "",
-      level4: fieldMapping.level4 || "",
-      level5: fieldMapping.level5 || "",
-      number: fieldMapping.number || "",
+      b1: fieldMapping.b1 || "",
+      b2: fieldMapping.b2 || "",
+      b3: fieldMapping.b3 || "",
+      b4: fieldMapping.b4 || "",
+      b5: fieldMapping.b5 || "",
+      t: fieldMapping.t || "",
+      i1: fieldMapping.i1 || "",
+      i2: fieldMapping.i2 || "",
+      i3: fieldMapping.i3 || "",
     };
   }
 
@@ -288,21 +417,24 @@ function autoMatchFields() {
 
 // 自动填充字段选择器
 function autoFillFieldSelectors() {
-  const selectors = [
-    "fieldLevel1",
-    "fieldLevel2",
-    "fieldLevel3",
-    "fieldLevel4",
-    "fieldNumber",
-  ];
+  const selectors = ["b1", "b2", "b3", "b4", "b5", "t", "i1", "i2", "i3"];
 
   selectors.forEach((selectorId) => {
     const select = document.getElementById(selectorId);
+    if (!select) return;
+
     select.innerHTML = "";
 
     const defaultOption = document.createElement("option");
     defaultOption.value = "";
-    defaultOption.textContent = "请选择字段";
+
+    // 信息节点默认显示"不显示"
+    if (selectorId.startsWith("i")) {
+      defaultOption.textContent = "不显示";
+    } else {
+      defaultOption.textContent = "请选择字段";
+    }
+
     select.appendChild(defaultOption);
 
     sheetHeaders.forEach((header) => {
@@ -315,17 +447,21 @@ function autoFillFieldSelectors() {
 
   // 尝试自动匹配默认字段
   const defaultMappings = {
-    fieldLevel1: fieldMapping.level1,
-    fieldLevel2: fieldMapping.level2,
-    fieldLevel3: fieldMapping.level3,
-    fieldLevel4: fieldMapping.level4,
-    fieldNumber: fieldMapping.number,
+    b1: fieldMapping.b1,
+    b2: fieldMapping.b2,
+    b3: fieldMapping.b3,
+    b4: fieldMapping.b4,
+    b5: fieldMapping.b5,
+    t: fieldMapping.t,
+    i1: fieldMapping.i1,
+    i2: fieldMapping.i2,
+    i3: fieldMapping.i3,
   };
 
   Object.keys(defaultMappings).forEach((selectorId) => {
     const select = document.getElementById(selectorId);
     const defaultValue = defaultMappings[selectorId];
-    if (sheetHeaders.includes(defaultValue)) {
+    if (select && defaultValue && sheetHeaders.includes(defaultValue)) {
       select.value = defaultValue;
     }
   });
@@ -399,12 +535,15 @@ function parseExcelData(rawData) {
 
   // 查找字段索引 - 使用用户选择的字段（未选择的为-1）
   const fieldMap = {
-    number: fieldMapping.number ? headers.indexOf(fieldMapping.number) : -1,
-    level1: fieldMapping.level1 ? headers.indexOf(fieldMapping.level1) : -1,
-    level2: fieldMapping.level2 ? headers.indexOf(fieldMapping.level2) : -1,
-    level3: fieldMapping.level3 ? headers.indexOf(fieldMapping.level3) : -1,
-    level4: fieldMapping.level4 ? headers.indexOf(fieldMapping.level4) : -1,
-    level5: fieldMapping.level5 ? headers.indexOf(fieldMapping.level5) : -1,
+    b1: fieldMapping.b1 ? headers.indexOf(fieldMapping.b1) : -1,
+    b2: fieldMapping.b2 ? headers.indexOf(fieldMapping.b2) : -1,
+    b3: fieldMapping.b3 ? headers.indexOf(fieldMapping.b3) : -1,
+    b4: fieldMapping.b4 ? headers.indexOf(fieldMapping.b4) : -1,
+    b5: fieldMapping.b5 ? headers.indexOf(fieldMapping.b5) : -1,
+    t: fieldMapping.t ? headers.indexOf(fieldMapping.t) : -1,
+    i1: fieldMapping.i1 ? headers.indexOf(fieldMapping.i1) : -1,
+    i2: fieldMapping.i2 ? headers.indexOf(fieldMapping.i2) : -1,
+    i3: fieldMapping.i3 ? headers.indexOf(fieldMapping.i3) : -1,
   };
 
   // 提取数据 - 保存所有字段
@@ -412,15 +551,20 @@ function parseExcelData(rawData) {
     .filter((row) => row.length > 0)
     .map((row, index) => {
       const testCase = {
-        _level1: sanitizeText(row[fieldMap.level1] || "未分类"), // 功能
-        _level2: sanitizeText(row[fieldMap.level2] || "默认"), // 类型
-        _level3: sanitizeText(row[fieldMap.level3] || "未分类"), // 子功能
-        _level4: sanitizeText(row[fieldMap.level4] || "未命名"), // 用例名称
-        _level5:
-          fieldMap.level5 >= 0 ? sanitizeText(row[fieldMap.level5]) : null, // 附加信息
-        _number: sanitizeText(String(row[fieldMap.number] || index + 2)), // 编号
-        _headers: headers, // 保存所有表头
-        _rawData: row, // 保存原始数据
+        // 枝节点数据
+        _b1: fieldMap.b1 >= 0 ? sanitizeText(row[fieldMap.b1]) : null,
+        _b2: fieldMap.b2 >= 0 ? sanitizeText(row[fieldMap.b2]) : null,
+        _b3: fieldMap.b3 >= 0 ? sanitizeText(row[fieldMap.b3]) : null,
+        _b4: fieldMap.b4 >= 0 ? sanitizeText(row[fieldMap.b4]) : null,
+        _b5: fieldMap.b5 >= 0 ? sanitizeText(row[fieldMap.b5]) : null,
+        // 叶节点数据
+        _t: fieldMap.t >= 0 ? sanitizeText(row[fieldMap.t]) : "未命名",
+        // 信息节点数据（I1-I3）
+        _i1: fieldMap.i1 >= 0 ? sanitizeText(row[fieldMap.i1]) : null,
+        _i2: fieldMap.i2 >= 0 ? sanitizeText(row[fieldMap.i2]) : null,
+        _i3: fieldMap.i3 >= 0 ? sanitizeText(row[fieldMap.i3]) : null,
+        _headers: headers,
+        _rawData: row,
       };
 
       // 添加所有字段（也需要转义）
@@ -445,113 +589,160 @@ function generateMindmapData() {
     return;
   }
 
-  // 按Level1-Level2-Level3分组，未选择的字段使用"默认"
-  const functionGroups = {};
-
-  testData.forEach((testCase) => {
-    // 获取各级别的值，未选择字段的级别统一使用"默认"
-    const level1 = fieldMapping.level1 ? testCase._level1 || "默认" : "默认";
-    const level2 = fieldMapping.level2 ? testCase._level2 || "默认" : "默认";
-    const level3 = fieldMapping.level3 ? testCase._level3 || "默认" : "默认";
-
-    if (!functionGroups[level1]) {
-      functionGroups[level1] = {};
-    }
-
-    if (!functionGroups[level1][level2]) {
-      functionGroups[level1][level2] = {};
-    }
-
-    if (!functionGroups[level1][level2][level3]) {
-      functionGroups[level1][level2][level3] = [];
-    }
-
-    functionGroups[level1][level2][level3].push(testCase);
-  });
-
-  // 构建树形结构
+  // 构建根节点
   mindmapData = {
     name: currentSheet || "表格",
     level: 0,
     children: [],
   };
 
-  // 一级节点按A-Z排序
-  Object.keys(functionGroups)
-    .sort((a, b) => {
-      return a.localeCompare(b, "zh-CN", { sensitivity: "base" });
-    })
-    .forEach((level1) => {
-      const level1Node = {
-        name: sanitizeText(level1),
-        level: 1,
-        children: [],
-      };
+  // 收集所有已配置的枝节点层级（B1-B5）
+  const branchLevels = [];
+  if (fieldMapping.b1) branchLevels.push("b1");
+  if (fieldMapping.b2) branchLevels.push("b2");
+  if (fieldMapping.b3) branchLevels.push("b3");
+  if (fieldMapping.b4) branchLevels.push("b4");
+  if (fieldMapping.b5) branchLevels.push("b5");
 
-      // 二级节点按A-Z排序
-      Object.keys(functionGroups[level1])
-        .sort((a, b) => {
-          return a.localeCompare(b, "zh-CN", { sensitivity: "base" });
-        })
-        .forEach((level2) => {
-          const level2Node = {
-            name: sanitizeText(level2),
-            level: 2,
-            children: [],
-          };
-
-          // 三级节点按A-Z排序
-          Object.keys(functionGroups[level1][level2])
-            .sort((a, b) => {
-              return a.localeCompare(b, "zh-CN", { sensitivity: "base" });
-            })
-            .forEach((level3) => {
-              // 创建三级节点
-              const level3Node = {
-                name: sanitizeText(level3),
-                level: 3,
-                children: [],
-              };
-
-              functionGroups[level1][level2][level3].forEach((testCase) => {
-                const level4 = fieldMapping.level4
-                  ? testCase._level4 || "默认"
-                  : "默认";
-                const number = testCase._number || "";
-
-                const level4Node = {
-                  name: sanitizeText(
-                    `${number ? "#" + number + "：" : ""}${level4}`,
-                  ),
-                  level: 4,
-                  testCase: testCase,
-                  children: [],
-                };
-
-                // 如果有 Level 5 附加信息，添加为子节点
-                if (testCase._level5) {
-                  level4Node.children.push({
-                    name: sanitizeText(String(testCase._level5)),
-                    level: 5,
-                    testCase: null,
-                    children: [],
-                  });
-                }
-
-                level3Node.children.push(level4Node);
-              });
-
-              level2Node.children.push(level3Node);
-            });
-
-          level1Node.children.push(level2Node);
-        });
-
-      mindmapData.children.push(level1Node);
+  // 如果没有配置任何枝节点，直接在根节点下挂叶节点
+  if (branchLevels.length === 0) {
+    testData.forEach((testCase) => {
+      const tNode = createPageNode(testCase);
+      mindmapData.children.push(tNode);
     });
+    sortNodes(mindmapData);
+    renderMindmap();
+    return;
+  }
+
+  // 按枝节点层级分组
+  const groupedData = groupByBranchLevels(testData, branchLevels);
+
+  // 递归构建树形结构
+  mindmapData.children = buildBranchTree(groupedData, branchLevels, 0);
+
+  // 对每一层的节点进行排序
+  sortNodes(mindmapData);
 
   // 渲染脑图
   renderMindmap();
+}
+
+// 按枝节点层级分组
+function groupByBranchLevels(data, branchLevels) {
+  const groups = {};
+
+  data.forEach((testCase) => {
+    // 构建分组键路径
+    const path = [];
+    branchLevels.forEach((level) => {
+      const value = testCase[`_${level}`] || "默认";
+      path.push(value);
+    });
+
+    // 创建嵌套的分组结构
+    let currentGroup = groups;
+    path.forEach((key, index) => {
+      if (!currentGroup[key]) {
+        currentGroup[key] = {
+          _testCases: [],
+          _children: {},
+        };
+      }
+      if (index === path.length - 1) {
+        currentGroup[key]._testCases.push(testCase);
+      } else {
+        currentGroup = currentGroup[key]._children;
+      }
+    });
+  });
+
+  return groups;
+}
+
+// 递归构建枝节点树
+function buildBranchTree(groups, branchLevels, level) {
+  const nodes = [];
+
+  Object.keys(groups).forEach((key) => {
+    const group = groups[key];
+    const node = {
+      name: sanitizeText(key),
+      level: level + 1, // 枝节点层级从1开始
+      children: [],
+      leafCount: 0, // 预计算的子叶节点数量
+    };
+
+    // 如果还有子层级，递归构建
+    if (
+      level < branchLevels.length - 1 &&
+      Object.keys(group._children).length > 0
+    ) {
+      const childNodes = buildBranchTree(group._children, branchLevels, level + 1);
+      childNodes.forEach((childNode) => {
+        node.children.push(childNode);
+        node.leafCount += childNode.leafCount || 0; // 累加子节点的叶节点数量
+      });
+    }
+
+    // 添加该组的所有叶节点（T节点）
+    group._testCases.forEach((testCase) => {
+      const tNode = createPageNode(testCase);
+      node.children.push(tNode);
+      node.leafCount += 1; // 每个叶节点计数+1
+    });
+
+    nodes.push(node);
+  });
+
+  return nodes;
+}
+
+// 创建叶节点（T节点）
+function createPageNode(testCase) {
+  const node = {
+    name: sanitizeText(testCase._t || "未命名"),
+    level: 10, // 叶节点使用层级10（在枝节点之后）
+    testCase: testCase,
+    children: [],
+  };
+
+  // 添加信息节点（I1-I3），如果有任何信息节点有值，创建一个合并的信息节点
+  const infoValues = [];
+  if (testCase._i1) infoValues.push(testCase._i1);
+  if (testCase._i2) infoValues.push(testCase._i2);
+  if (testCase._i3) infoValues.push(testCase._i3);
+
+  if (infoValues.length > 0) {
+    node.children.push({
+      name: infoValues.join(" | "), // 多个信息字段用 " | " 分隔
+      level: 11, // 信息节点使用层级11
+      testCase: null,
+      infoData: {
+        i1: testCase._i1,
+        i2: testCase._i2,
+        i3: testCase._i3,
+      },
+      children: [],
+    });
+  }
+
+  return node;
+}
+
+// 对节点进行排序（A-Z）
+function sortNodes(parentNode) {
+  if (!parentNode.children || parentNode.children.length === 0) return;
+
+  // 对子节点排序
+  parentNode.children.sort((a, b) => {
+    return a.name.localeCompare(b.name, "zh-CN", { sensitivity: "base" });
+  });
+
+  // 递归排序子节点
+  parentNode.children.forEach((child) => {
+    sortNodes(child);
+  });
 }
 
 // 渲染脑图
@@ -598,7 +789,7 @@ function createNodes(data, level, parentId) {
   const node = {
     id: nodeId,
     name: data.name,
-    level: level,
+    level: data.level, // 使用数据中的 level，而不是参数
     x: 0,
     y: 0,
     width: 0,
@@ -606,7 +797,9 @@ function createNodes(data, level, parentId) {
     parentId: parentId,
     children: [], // 先初始化为空数组
     testCase: data.testCase || null,
-    expanded: level <= 4, // Level 0-4 默认展开，Level 5 始终展开（无子节点）
+    infoData: data.infoData || null, // 保留信息节点的数据
+    leafCount: data.leafCount || 0, // 保留预计算的叶节点数量
+    expanded: data.level <= 5 || data.level >= 10, // 枝节点（1-5）和叶节点（10）和信息节点（11）默认展开
   };
 
   nodes.push(node);
@@ -614,7 +807,7 @@ function createNodes(data, level, parentId) {
   // 然后递归创建子节点，并记录子节点ID
   if (data.children && data.children.length > 0) {
     data.children.forEach((child) => {
-      const childId = createNodes(child, level + 1, nodeId);
+      const childId = createNodes(child, data.level, nodeId);
       node.children.push(childId);
     });
   }
@@ -633,33 +826,42 @@ function autoLayout(skipUpdateTransform = false) {
 
   // 根据节点层级获取节点高度
   function getNodeHeight(node) {
-    if (node.level === 4) {
-      return 40; // 用例节点高度
+    if (node.level >= 1 && node.level <= 5) {
+      return NODE_HEIGHT; // 枝节点使用默认高度
     }
-    if (node.level === 5) {
-      return 24; // 附加信息节点高度
+    if (node.level === 10) {
+      return 40; // 叶节点（T）高度
+    }
+    if (node.level === 11) {
+      return 24; // 信息节点（I）高度
     }
     return NODE_HEIGHT;
   }
 
   // 根据节点层级获取节点宽度
   function getNodeWidth(node) {
-    if (node.level === 4) {
-      return 600; // 用例节点宽度（固定）
+    if (node.level >= 1 && node.level <= 5) {
+      return NODE_WIDTH; // 枝节点使用默认宽度
     }
-    if (node.level === 5) {
-      return 0; // Level 5 节点宽度自适应，由 CSS 控制
+    if (node.level === 10) {
+      return 600; // 叶节点（T）宽度（固定）
+    }
+    if (node.level === 11) {
+      // 信息节点（I）宽度需要动态计算文本长度
+      // 估算：每个中文字符约11px，左右padding共32px
+      const textWidth = node.name ? node.name.length * 11 : 0;
+      return textWidth + 32; // 加上左右padding（16px * 2）
     }
     return NODE_WIDTH;
   }
 
   // 根据节点层级获取垂直间距
   function getVerticalGap(parentNode) {
-    if (parentNode.level === 3) {
-      return 15; // 类型到用例的间距更小
+    if (parentNode.level === 10) {
+      return 8; // 叶节点（T）到信息节点（I）的间距最小
     }
-    if (parentNode.level === 4) {
-      return 8; // Level 4 到 Level 5 的间距最小
+    if (parentNode.level >= 1 && parentNode.level <= 5) {
+      return 15; // 枝节点之间的间距
     }
     return VERTICAL_GAP;
   }
@@ -712,7 +914,9 @@ function autoLayout(skipUpdateTransform = false) {
         return currentDepth === d;
       });
       if (nodeAtDepth) {
-        xOffset += getNodeWidth(nodeAtDepth) + HORIZONTAL_GAP;
+        const widthAtDepth = getNodeWidth(nodeAtDepth);
+        xOffset +=
+          (widthAtDepth > 0 ? widthAtDepth : NODE_WIDTH) + HORIZONTAL_GAP;
       } else {
         xOffset += NODE_WIDTH + HORIZONTAL_GAP;
       }
@@ -775,12 +979,12 @@ function autoLayout(skipUpdateTransform = false) {
   }
 }
 
-// 计算节点的子用例总数（只计算level 4的节点）
+// 计算节点的子叶节点总数（只计算level 10的叶节点）
 function countChildTestCases(nodeId) {
   const node = nodes[nodeId];
 
-  // 如果是level 4（节点），返回1
-  if (node.level === 4) {
+  // 如果是叶节点（T，level 10），返回1
+  if (node.level === 10) {
     return 1;
   }
 
@@ -789,7 +993,7 @@ function countChildTestCases(nodeId) {
     return 0;
   }
 
-  // 递归计算所有子节点的用例数量
+  // 递归计算所有子节点的叶节点数量
   let count = 0;
   node.children.forEach((childId) => {
     count += countChildTestCases(childId);
@@ -830,22 +1034,25 @@ function renderNodes() {
     nodeElement.id = `node-${node.id}`;
 
     // 添加展开/折叠指示器（如果有子节点）
-    // Level 0-3 显示指示器，Level 4-5 不显示
+    // 枝节点（1-5）显示指示器，叶节点（10）和信息节点（11）不显示
     let indicator = "";
-    if (node.children && node.children.length > 0 && node.level <= 3) {
+    if (
+      node.children &&
+      node.children.length > 0 &&
+      node.level >= 1 &&
+      node.level <= 5
+    ) {
       indicator = node.expanded ? "▼ " : "▶ ";
     }
 
-    // 为level 1, 2, 3添加子用例数量统计
+    // 为枝节点（1-5）添加子节点数量统计
     let displayText = node.name;
     if (
       node.level >= 1 &&
-      node.level <= 3 &&
-      node.children &&
-      node.children.length > 0
+      node.level <= 5 &&
+      node.leafCount > 0  // 使用预计算的叶节点数量
     ) {
-      const testCaseCount = countChildTestCases(node.id);
-      displayText = `${node.name} (${testCaseCount})`;
+      displayText = `${node.name} (${node.leafCount})`;
     }
 
     // 创建节点文本元素 - 使用 textContent 防止 XSS
@@ -853,6 +1060,11 @@ function renderNodes() {
     nodeText.className = "node-text";
     nodeText.textContent = indicator + displayText;
     nodeElement.appendChild(nodeText);
+
+    // 为信息节点（level 11）添加 tooltip
+    if (node.level === 11 && node.infoData) {
+      createInfoTooltip(node, nodeElement);
+    }
 
     // 设置位置
     nodeElement.style.left = `${node.x}px`;
@@ -870,6 +1082,52 @@ function renderNodes() {
   });
 }
 
+// 创建信息节点Tooltip
+function createInfoTooltip(node, element) {
+  if (!node.infoData) return;
+
+  const tooltip = document.createElement("div");
+  tooltip.className = "info-tooltip";
+
+  // 获取信息字段名称
+  const i1Name = fieldMapping.i1 || "I1";
+  const i2Name = fieldMapping.i2 || "I2";
+  const i3Name = fieldMapping.i3 || "I3";
+
+  // 构建tooltip内容
+  if (node.infoData.i1) {
+    const item = document.createElement("div");
+    item.className = "tooltip-item";
+    item.innerHTML = `<span class="tooltip-label">${sanitizeText(i1Name)}：</span>${sanitizeText(node.infoData.i1)}`;
+    tooltip.appendChild(item);
+  }
+
+  if (node.infoData.i2) {
+    const item = document.createElement("div");
+    item.className = "tooltip-item";
+    item.innerHTML = `<span class="tooltip-label">${sanitizeText(i2Name)}：</span>${sanitizeText(node.infoData.i2)}`;
+    tooltip.appendChild(item);
+  }
+
+  if (node.infoData.i3) {
+    const item = document.createElement("div");
+    item.className = "tooltip-item";
+    item.innerHTML = `<span class="tooltip-label">${sanitizeText(i3Name)}：</span>${sanitizeText(node.infoData.i3)}`;
+    tooltip.appendChild(item);
+  }
+
+  element.appendChild(tooltip);
+
+  // 鼠标悬停显示tooltip
+  element.addEventListener("mouseenter", () => {
+    tooltip.style.display = "block";
+  });
+
+  element.addEventListener("mouseleave", () => {
+    tooltip.style.display = "none";
+  });
+}
+
 // 渲染连接线
 function renderConnections() {
   const svg = document.getElementById("connections");
@@ -880,6 +1138,26 @@ function renderConnections() {
 
     const parentNode = nodes[node.parentId];
     if (!parentNode.expanded) return; // 如果父节点折叠，不渲染连接线
+
+    const connectionId = `connection-${parentNode.id}-${node.id}`;
+
+    // 内联计算节点宽度和高度
+    const getNodeHeight = (n) => {
+      if (n.level >= 1 && n.level <= 5) return 70;
+      if (n.level === 10) return 40;
+      if (n.level === 11) return 24;
+      return 70;
+    };
+
+    const getNodeWidth = (n) => {
+      if (n.level >= 1 && n.level <= 5) return 220;
+      if (n.level === 10) return 600;
+      if (n.level === 11) {
+        const textWidth = n.name ? n.name.length * 11 : 0;
+        return textWidth + 32;
+      }
+      return 220;
+    };
 
     const startX = parentNode.x + getNodeWidth(parentNode);
     const startY = parentNode.y + getNodeHeight(parentNode) / 2;
@@ -895,6 +1173,7 @@ function renderConnections() {
 
     const d = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
 
+    path.setAttribute("id", connectionId);
     path.setAttribute("d", d);
     path.setAttribute("class", "connection");
 
@@ -903,6 +1182,7 @@ function renderConnections() {
       "http://www.w3.org/2000/svg",
       "path",
     );
+    hitbox.setAttribute("id", `${connectionId}-hitbox`);
     hitbox.setAttribute("d", d);
     hitbox.setAttribute("class", "connection-hitbox");
 
@@ -939,12 +1219,12 @@ function getNodeWidth(node) {
 
 // 获取节点高度（用于连接线渲染）
 function getNodeHeight(node) {
-  // 对于 L4 和 L5 节点，使用与 autoLayout 中相同的高度计算
-  if (node.level === 4) {
-    return 40; // 用例节点高度（与 autoLayout 中的值一致）
+  // 对于叶节点（T）和信息节点（I），使用与 autoLayout 中相同的高度计算
+  if (node.level === 10) {
+    return 40; // 叶节点高度（与 autoLayout 中的值一致）
   }
-  if (node.level === 5) {
-    return 24; // 附加信息节点高度（与 autoLayout 中的值一致）
+  if (node.level === 11) {
+    return 24; // 信息节点高度（与 autoLayout 中的值一致）
   }
 
   // 其他节点：读取实际 DOM 高度
@@ -960,6 +1240,7 @@ function addDragEvents(element, nodeId) {
   let isDragging = false;
   let hasMoved = false;
   let startX, startY, initialX, initialY;
+  let rafId = null;
 
   element.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return; // 只响应左键
@@ -984,19 +1265,31 @@ function addDragEvents(element, nodeId) {
       hasMoved = true;
     }
 
-    nodes[nodeId].x = initialX + dx;
-    nodes[nodeId].y = initialY + dy;
+    // 考虑canvas的缩放，将屏幕坐标转换为canvas坐标
+    nodes[nodeId].x = initialX + dx / scale;
+    nodes[nodeId].y = initialY + dy / scale;
 
     element.style.left = `${nodes[nodeId].x}px`;
     element.style.top = `${nodes[nodeId].y}px`;
 
-    renderConnections();
+    // 使用 requestAnimationFrame 节流，避免频繁重绘
+    if (rafId === null) {
+      rafId = requestAnimationFrame(() => {
+        renderConnections(); // 直接重绘所有连接线，简单可靠
+        rafId = null;
+      });
+    }
   });
 
   document.addEventListener("mouseup", (e) => {
     if (isDragging) {
       isDragging = false;
       element.classList.remove("dragging");
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      renderConnections(); // 拖动结束后完整更新一次
 
       // 如果没有移动，触发点击事件
       if (!hasMoved) {
@@ -1274,6 +1567,9 @@ function toggleNode(nodeId) {
   const node = nodes[nodeId];
   if (!node || !node.children || node.children.length === 0) return;
 
+  // 叶节点（T）和信息节点（I）不可展开折叠
+  if (node.level === 10 || node.level === 11) return;
+
   // 保存当前节点在屏幕上的位置（在 DOM 更新之前）
   const nodeElement = document.getElementById(`node-${nodeId}`);
   const oldRect = nodeElement.getBoundingClientRect();
@@ -1288,31 +1584,20 @@ function toggleNode(nodeId) {
     // 展开：只展开当前节点
     node.expanded = true;
 
-    // 如果是 Level 3 节点，同时展开其所有 Level 4 子节点及其 Level 5 子节点
-    if (node.level === 3 && node.children && node.children.length > 0) {
+    // 枝节点（1-5）：展开时自动展开叶节点（T）和信息节点（I）
+    if (
+      node.level >= 1 &&
+      node.level <= 5 &&
+      node.children &&
+      node.children.length > 0
+    ) {
       node.children.forEach((childId) => {
         const childNode = nodes[childId];
-        if (childNode && childNode.level === 4) {
-          childNode.expanded = true;
-          // 同时展开 Level 4 的 Level 5 子节点
-          if (childNode.children && childNode.children.length > 0) {
-            childNode.children.forEach((grandchildId) => {
-              const grandchildNode = nodes[grandchildId];
-              if (grandchildNode && grandchildNode.level === 5) {
-                grandchildNode.expanded = true;
-              }
-            });
+        if (childNode) {
+          // 叶节点（T）和信息节点（I）自动展开
+          if (childNode.level === 10 || childNode.level === 11) {
+            childNode.expanded = true;
           }
-        }
-      });
-    }
-
-    // 如果是 Level 4 节点，同时展开其所有 Level 5 子节点
-    if (node.level === 4 && node.children && node.children.length > 0) {
-      node.children.forEach((childId) => {
-        const childNode = nodes[childId];
-        if (childNode && childNode.level === 5) {
-          childNode.expanded = true;
         }
       });
     }
@@ -1837,7 +2122,14 @@ function showSheetPreview() {
 
   try {
     const worksheet = workbook.Sheets[currentSheet];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    let jsonData;
+
+    // 检查是否是 CSV 数据
+    if (worksheet.CSV) {
+      jsonData = worksheet.data;
+    } else {
+      jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    }
 
     if (!jsonData || jsonData.length === 0) {
       showToast("工作表没有数据", "warning");
@@ -1856,19 +2148,24 @@ function showSheetPreview() {
 
     // 填充字段选择器
     const fieldSelectors = [
-      "preview-fieldLevel1",
-      "preview-fieldLevel2",
-      "preview-fieldLevel3",
-      "preview-fieldLevel4",
-      "preview-fieldLevel5",
+      "preview-b1",
+      "preview-b2",
+      "preview-b3",
+      "preview-b4",
+      "preview-b5",
+      "preview-t",
+      "preview-i1",
+      "preview-i2",
+      "preview-i3",
     ];
 
     fieldSelectors.forEach((selectorId) => {
       const select = document.getElementById(selectorId);
+      if (!select) return;
+
       select.innerHTML = "";
 
-      const placeholder =
-        selectorId === "preview-fieldLevel5" ? "不显示" : "请选择";
+      const placeholder = selectorId.startsWith("i") ? "不显示" : "请选择";
       const defaultOption = document.createElement("option");
       defaultOption.value = "";
       defaultOption.textContent = placeholder;
@@ -1884,23 +2181,36 @@ function showSheetPreview() {
 
     // 使用已配置的字段（如果存在），否则自动匹配
     if (window.selectedFields) {
-      document.getElementById("preview-fieldLevel1").value =
-        window.selectedFields.level1 || "";
-      document.getElementById("preview-fieldLevel2").value =
-        window.selectedFields.level2 || "";
-      document.getElementById("preview-fieldLevel3").value =
-        window.selectedFields.level3 || "";
-      document.getElementById("preview-fieldLevel4").value =
-        window.selectedFields.level4 || "";
-      document.getElementById("preview-fieldLevel5").value =
-        window.selectedFields.level5 || "";
+      document.getElementById("preview-b1").value =
+        window.selectedFields.b1 || "";
+      document.getElementById("preview-b2").value =
+        window.selectedFields.b2 || "";
+      document.getElementById("preview-b3").value =
+        window.selectedFields.b3 || "";
+      document.getElementById("preview-b4").value =
+        window.selectedFields.b4 || "";
+      document.getElementById("preview-b5").value =
+        window.selectedFields.b5 || "";
+      document.getElementById("preview-t").value =
+        window.selectedFields.t || "";
+      document.getElementById("preview-i1").value =
+        window.selectedFields.i1 || "";
+      document.getElementById("preview-i2").value =
+        window.selectedFields.i2 || "";
+      document.getElementById("preview-i3").value =
+        window.selectedFields.i3 || "";
     } else {
       // 尝试自动匹配默认字段（使用 fieldMapping 中已经匹配好的字段）
       const mappings = {
-        "preview-fieldLevel1": fieldMapping.level1,
-        "preview-fieldLevel2": fieldMapping.level2,
-        "preview-fieldLevel3": fieldMapping.level3,
-        "preview-fieldLevel4": fieldMapping.level4,
+        "preview-b1": fieldMapping.b1,
+        "preview-b2": fieldMapping.b2,
+        "preview-b3": fieldMapping.b3,
+        "preview-b4": fieldMapping.b4,
+        "preview-b5": fieldMapping.b5,
+        "preview-t": fieldMapping.t,
+        "preview-i1": fieldMapping.i1,
+        "preview-i2": fieldMapping.i2,
+        "preview-i3": fieldMapping.i3,
       };
 
       Object.keys(mappings).forEach((selectorId) => {
@@ -1908,7 +2218,7 @@ function showSheetPreview() {
         const fieldName = mappings[selectorId];
 
         // 如果字段已匹配，设置选择器的值
-        if (fieldName) {
+        if (select && fieldName) {
           select.value = fieldName;
         }
       });
@@ -1917,17 +2227,23 @@ function showSheetPreview() {
     // 添加字段变更监听器，实时同步到已配置字段
     fieldSelectors.forEach((selectorId) => {
       const select = document.getElementById(selectorId);
+      if (!select) return;
+
       select.onchange = function () {
         if (!window.selectedFields) {
           window.selectedFields = {
-            level1: "",
-            level2: "",
-            level3: "",
-            level4: "",
-            number: "",
+            b1: "",
+            b2: "",
+            b3: "",
+            b4: "",
+            b5: "",
+            t: "",
+            i1: "",
+            i2: "",
+            i3: "",
           };
         }
-        const fieldKey = selectorId.replace("preview-field", "").toLowerCase();
+        const fieldKey = selectorId.replace("preview-", "");
         window.selectedFields[fieldKey] = this.value;
       };
     });
@@ -2034,36 +2350,46 @@ function showSheetPreview() {
 
 // 从预览modal生成脑图
 function generateMindmapFromPreview() {
-  const level1 = document.getElementById("preview-fieldLevel1").value;
-  const level2 = document.getElementById("preview-fieldLevel2").value;
-  const level3 = document.getElementById("preview-fieldLevel3").value;
-  const level4 = document.getElementById("preview-fieldLevel4").value;
-  const level5 = document.getElementById("preview-fieldLevel5").value;
+  const b1 = document.getElementById("preview-b1").value;
+  const b2 = document.getElementById("preview-b2").value;
+  const b3 = document.getElementById("preview-b3").value;
+  const b4 = document.getElementById("preview-b4").value;
+  const b5 = document.getElementById("preview-b5").value;
+  const t = document.getElementById("preview-t").value;
+  const i1 = document.getElementById("preview-i1").value;
+  const i2 = document.getElementById("preview-i2").value;
+  const i3 = document.getElementById("preview-i3").value;
 
-  // 验证必填字段
-  if (!level1 || !level4) {
-    showToast("请至少选择 Level 1 和 Level 4 字段", "warning");
+  // 验证必填字段：至少需要B1和T
+  if (!b1 || !t) {
+    showToast("请至少选择 B1（枝节点）和 T（叶节点）字段", "warning");
     return;
   }
 
   // 更新 fieldMapping（这是 parseExcelData 使用的）
   fieldMapping = {
-    level1: level1 || null,
-    level2: level2 || null,
-    level3: level3 || null,
-    level4: level4 || null,
-    level5: level5 || null, // Level 5 附加信息
-    number: null,
+    b1: b1 || null,
+    b2: b2 || null,
+    b3: b3 || null,
+    b4: b4 || null,
+    b5: b5 || null,
+    t: t || null,
+    i1: i1 || null,
+    i2: i2 || null,
+    i3: i3 || null,
   };
 
   // 同时保存到 window.selectedFields（用于预览时显示已选字段）
   window.selectedFields = {
-    level1: level1,
-    level2: level2,
-    level3: level3,
-    level4: level4,
-    level5: level5,
-    number: "",
+    b1: b1,
+    b2: b2,
+    b3: b3,
+    b4: b4,
+    b5: b5,
+    t: t,
+    i1: i1,
+    i2: i2,
+    i3: i3,
   };
 
   // 关闭预览modal
@@ -2072,7 +2398,14 @@ function generateMindmapFromPreview() {
   // 重新解析当前工作表数据并生成脑图
   if (currentSheet && workbook) {
     const worksheet = workbook.Sheets[currentSheet];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    let jsonData;
+
+    // 检查是否是 CSV 数据
+    if (worksheet.CSV) {
+      jsonData = worksheet.data;
+    } else {
+      jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    }
 
     if (jsonData.length >= 2) {
       parseExcelData(jsonData);

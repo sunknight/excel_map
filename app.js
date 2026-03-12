@@ -937,25 +937,25 @@ function autoLayout(skipUpdateTransform = false, preserveLayout = false) {
   }
 
   // 第一步：计算每个节点的子树所需的总高度
-  // preserveLayout: 为单个节点切换时保持布局，使用完整展开时的高度
   function calculateSubtreeSize(nodeId, preserveLayout = false) {
     const node = nodes[nodeId];
     const nodeHeight = getNodeHeight(node);
 
-    if (!preserveLayout && (!node.expanded || node.children.length === 0)) {
-      // 正常模式：折叠的节点或叶子节点，只使用自身高度
+    // 叶子节点：直接返回自身高度
+    if (node.children.length === 0) {
       node.subtreeHeight = nodeHeight;
       return nodeHeight;
     }
 
-    if (preserveLayout && node.children.length === 0) {
-      // 保持布局模式：叶子节点
+    // 有子节点的节点：
+    // 根据折叠状态决定是否计算子节点空间
+    // 折叠状态：只计算自身高度，子节点不占用空间
+    // 展开状态：计算完整子树高度
+    if (!node.expanded) {
       node.subtreeHeight = nodeHeight;
       return nodeHeight;
     }
 
-    // 计算所有子节点的高度总和
-    // 在preserveLayout模式下，无论折叠状态都计算完整子树
     let totalHeight = 0;
     const verticalGap = getVerticalGap(node);
     for (let i = 0; i < node.children.length; i++) {
@@ -1002,36 +1002,40 @@ function autoLayout(skipUpdateTransform = false, preserveLayout = false) {
     node.x = xOffset;
 
     // 设置Y坐标
-    if (!node.expanded || node.children.length === 0) {
-      // 折叠的节点或叶子节点：直接使用startY
+    if (node.children.length === 0 || !node.expanded) {
+      // 叶子节点或折叠节点：直接使用startY
       node.y = startY;
     } else {
-      // 展开且有子节点的节点：先布局子节点，然后根据子节点位置计算父节点位置
+      // 展开的节点：根据子节点位置计算父节点位置
       let currentY = startY;
       const verticalGap = getVerticalGap(node);
 
-      // 递归布局所有子节点
+      // 计算所有子节点的位置
+      const childPositions = [];
       for (let i = 0; i < node.children.length; i++) {
         const childId = node.children[i];
         const child = nodes[childId];
         const childHeight = child.subtreeHeight;
 
-        // 布局子节点
+        // 记录子节点的Y位置
+        childPositions.push(currentY);
+
+        // 递归布局子节点
         layoutNode(childId, depth + 1, currentY);
 
         currentY += childHeight + verticalGap;
       }
 
-      // 根据子节点位置计算父节点位置（居中）
+      // 根据子节点位置计算父节点位置
       const firstChildId = node.children[0];
       const firstChild = nodes[firstChildId];
       const firstChildNodeHeight = getNodeHeight(firstChild);
-      const firstChildCenter = firstChild.y + firstChildNodeHeight / 2;
+      const firstChildCenter = childPositions[0] + firstChildNodeHeight / 2;
 
       const lastChildId = node.children[node.children.length - 1];
       const lastChild = nodes[lastChildId];
       const lastChildNodeHeight = getNodeHeight(lastChild);
-      const lastChildCenter = lastChild.y + lastChildNodeHeight / 2;
+      const lastChildCenter = childPositions[childPositions.length - 1] + lastChildNodeHeight / 2;
 
       // 父节点中心 = 第一个子节点中心 + (最后一个子节点中心 - 第一个子节点中心) / 2
       node.y = (firstChildCenter + lastChildCenter) / 2 - nodeHeight / 2;
@@ -1695,11 +1699,13 @@ function toggleNode(nodeId) {
   // 叶节点（T）和信息节点（I）不可展开折叠
   if (node.level === 10 || node.level === 11) return;
 
-  // 保存当前节点在屏幕上的位置（在 DOM 更新之前）
+  // 记录当前节点的屏幕位置（布局前）
   const nodeElement = document.getElementById(`node-${nodeId}`);
-  const oldRect = nodeElement.getBoundingClientRect();
-  const oldCenterX = oldRect.left + oldRect.width / 2;
-  const oldCenterY = oldRect.top + oldRect.height / 2;
+  let screenY = null;
+  if (nodeElement) {
+    const rect = nodeElement.getBoundingClientRect();
+    screenY = rect.top + rect.height / 2; // 节点中心的屏幕Y坐标
+  }
 
   if (node.expanded) {
     // 折叠：折叠当前节点及其所有子孙节点
@@ -1729,28 +1735,23 @@ function toggleNode(nodeId) {
   }
 
   // 重新布局，使用紧凑布局（根据实际折叠状态调整间距）
-  autoLayout(true, false);
+  autoLayout(false, false);
 
-  // 使用双重 requestAnimationFrame 确保 DOM 完全渲染后再获取新位置
-  requestAnimationFrame(() => {
+  // 调整panY，保持当前节点的屏幕位置不变
+  if (screenY !== null) {
     requestAnimationFrame(() => {
       const newElement = document.getElementById(`node-${nodeId}`);
-      const newRect = newElement.getBoundingClientRect();
-      const newCenterX = newRect.left + newRect.width / 2;
-      const newCenterY = newRect.top + newRect.height / 2;
+      if (newElement) {
+        const newRect = newElement.getBoundingClientRect();
+        const newScreenY = newRect.top + newRect.height / 2;
 
-      // 计算节点在屏幕上移动的距离
-      const deltaX = newCenterX - oldCenterX;
-      const deltaY = newCenterY - oldCenterY;
-
-      // 调整 panX 和 panY 来补偿移动
-      panX -= deltaX;
-      panY -= deltaY;
-
-      // 更新画布变换
-      updateCanvasTransform();
+        // 计算需要调整的偏移量
+        const deltaY = screenY - newScreenY;
+        panY += deltaY;
+        updateCanvasTransform();
+      }
     });
-  });
+  }
 }
 
 // 递归折叠所有子孙节点

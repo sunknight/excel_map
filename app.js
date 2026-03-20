@@ -1350,6 +1350,8 @@ function addDragEvents(element, nodeId) {
   let hasMoved = false;
   let startX, startY, initialX, initialY;
   let rafId = null;
+  let clickTimer = null; // 单击延迟定时器
+  const DOUBLE_CLICK_THRESHOLD = 300; // 双击时间阈值（毫秒）
 
   element.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return; // 只响应左键
@@ -1403,10 +1405,56 @@ function addDragEvents(element, nodeId) {
       // 如果没有移动，触发点击事件
       if (!hasMoved) {
         const node = nodes[nodeId];
-        if (node.testCase) {
-          showTestCaseDetail(node.testCase);
-        } else if (node.children && node.children.length > 0) {
-          toggleNode(nodeId);
+
+        // 如果已经有延迟的单击等待执行，说明这是双击
+        if (clickTimer !== null) {
+          // 清除单击定时器
+          clearTimeout(clickTimer);
+          clickTimer = null;
+
+          // 双击：展开所有子孙节点（根节点和枝节点）
+          if (node.children && node.children.length > 0) {
+            // 记录当前节点的屏幕位置（布局前）
+            const nodeElement = document.getElementById(`node-${nodeId}`);
+            let screenY = null;
+            if (nodeElement) {
+              const rect = nodeElement.getBoundingClientRect();
+              screenY = rect.top + rect.height / 2; // 节点中心的屏幕Y坐标
+            }
+
+            // 展开所有子孙节点
+            expandAllDescendants(nodeId);
+            node.expanded = true;
+            autoLayout(false, false);
+
+            // 调整panY，保持当前节点的屏幕位置不变
+            if (screenY !== null) {
+              requestAnimationFrame(() => {
+                const newElement = document.getElementById(`node-${nodeId}`);
+                if (newElement) {
+                  const newRect = newElement.getBoundingClientRect();
+                  const newScreenY = newRect.top + newRect.height / 2;
+
+                  // 计算需要调整的偏移量
+                  const deltaY = screenY - newScreenY;
+                  panY += deltaY;
+                  updateCanvasTransform();
+                }
+              });
+            }
+          }
+        } else {
+          // 第一次点击：延迟执行单击，等待可能的双击
+          clickTimer = setTimeout(() => {
+            clickTimer = null;
+
+            // 单击：显示详情或切换折叠状态
+            if (node.testCase) {
+              showTestCaseDetail(node.testCase);
+            } else if (node.children && node.children.length > 0) {
+              toggleNode(nodeId);
+            }
+          }, DOUBLE_CLICK_THRESHOLD);
         }
       }
     }
@@ -1764,6 +1812,20 @@ function collapseAllDescendants(nodeId) {
     if (child) {
       child.expanded = false;
       collapseAllDescendants(childId);
+    }
+  });
+}
+
+// 递归展开所有子孙节点
+function expandAllDescendants(nodeId) {
+  const node = nodes[nodeId];
+  if (!node || !node.children) return;
+
+  node.children.forEach((childId) => {
+    const child = nodes[childId];
+    if (child) {
+      child.expanded = true;
+      expandAllDescendants(childId);
     }
   });
 }

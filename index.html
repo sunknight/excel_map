@@ -643,12 +643,12 @@
             <div class="header-center">
                 <div class="file-section">
                     <div class="file-upload">
-                        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+                        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.json" />
                         <button
                             class="upload-btn"
                             onclick="document.getElementById('fileInput').click()"
                         >
-                            📁 上传Excel文件
+                            📁 上传文件
                         </button>
                         <span id="securityNotice" class="security-notice">
                             文档仅在浏览器内处理，不会上传任何服务器
@@ -699,9 +699,9 @@
                 <svg class="connections" id="connections"></svg>
                 <div class="empty-state" id="emptyState">
                     <div class="icon">📊</div>
-                    <p>请上传Excel文件生成脑图</p>
+                    <p>请上传Excel或JSON文件生成脑图</p>
                     <p style="font-size: 13px; color: #bfbfbf">
-                        支持.xlsx和.xls格式
+                        支持.xlsx、.xls和.json格式
                     </p>
                 </div>
             </div>

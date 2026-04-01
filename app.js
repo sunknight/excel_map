@@ -153,7 +153,9 @@ function handleFileUpload(event) {
     try {
       const fileExtension = file.name.split(".").pop().toLowerCase();
 
-      if (fileExtension === "csv") {
+      if (fileExtension === "json") {
+        handleJSONFile(e.target.result);
+      } else if (fileExtension === "csv") {
         // 处理 CSV 文件
         handleCSVFile(e.target.result);
       } else {
@@ -166,7 +168,7 @@ function handleFileUpload(event) {
     }
   };
 
-  if (file.name.endsWith(".csv")) {
+  if (file.name.endsWith(".json") || file.name.endsWith(".csv")) {
     reader.readAsText(file, "UTF-8");
   } else {
     reader.readAsArrayBuffer(file);
@@ -238,6 +240,130 @@ function handleCSVFile(csvText) {
 
   // 隐藏安全提示
   const securityNotice = document.getElementById("securityNotice");
+  if (securityNotice) {
+    securityNotice.style.display = "none";
+  }
+}
+
+// 提取JSON中所有对象数组路径（3级深度内）
+function extractJSONArrayPaths(obj, maxDepth) {
+  if (typeof maxDepth === 'undefined') maxDepth = 3;
+  var results = [];
+  function scan(current, path, depth) {
+    if (depth > maxDepth) return;
+    if (typeof current !== 'object' || current === null || Array.isArray(current)) return;
+    var keys = Object.keys(current);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var value = current[key];
+      var newPath = path ? path + '.' + key : key;
+      if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0] !== null && !Array.isArray(value[0])) {
+        results.push({ path: newPath, name: key, data: value });
+      }
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        scan(value, newPath, depth + 1);
+      }
+    }
+  }
+  scan(obj, '', 1);
+  return results;
+}
+
+// 将JSON对象数组转为二维数组（兼容Excel数据格式）
+function jsonArrayToSheetData(arrayOfObjects) {
+  if (!arrayOfObjects || arrayOfObjects.length === 0) return [];
+  var headers = Object.keys(arrayOfObjects[0]);
+  var rows = arrayOfObjects.map(function(obj) {
+    return headers.map(function(h) {
+      var val = obj[h];
+      if (val === undefined || val === null) return '';
+      if (Array.isArray(val)) return '[list]';
+      if (typeof val === 'object') return '[object]';
+      return val;
+    });
+  });
+  return [headers].concat(rows);
+}
+
+// 处理 JSON 文件
+function handleJSONFile(jsonText) {
+  var jsonObj;
+  try {
+    jsonObj = JSON.parse(jsonText);
+  } catch (e) {
+    alert("JSON解析失败，请检查文件格式");
+    return;
+  }
+
+  var arrayPaths = extractJSONArrayPaths(jsonObj, 3);
+
+  if (arrayPaths.length === 0) {
+    alert("JSON文件中未找到对象数组数据");
+    return;
+  }
+
+  // 构建 workbook 结构，兼容现有 switchSheet 逻辑
+  var sheets = {};
+  var sheetNames = [];
+  arrayPaths.forEach(function(item) {
+    var sheetData = jsonArrayToSheetData(item.data);
+    if (sheetData.length >= 2) {
+      sheetNames.push(item.name);
+      sheets[item.name] = { JSON: true, data: sheetData };
+    }
+  });
+
+  if (sheetNames.length === 0) {
+    alert("JSON文件中未找到有效的对象数组数据");
+    return;
+  }
+
+  workbook = { SheetNames: sheetNames, Sheets: sheets };
+
+  // 填充 Sheet 选择器
+  var sheetSelect = document.getElementById("sheetSelect");
+  sheetSelect.innerHTML = "";
+
+  if (window.currentFileName) {
+    var fileNameOption = document.createElement("option");
+    fileNameOption.value = "";
+    fileNameOption.textContent = "\uD83D\uDCC4 " + window.currentFileName;
+    fileNameOption.disabled = true;
+    fileNameOption.style.fontWeight = "bold";
+    fileNameOption.style.color = "#2A4B8D";
+    sheetSelect.appendChild(fileNameOption);
+  }
+
+  var separatorOption = document.createElement("option");
+  separatorOption.value = "";
+  separatorOption.textContent = "─ 选择数据表 ─";
+  separatorOption.disabled = true;
+  sheetSelect.appendChild(separatorOption);
+
+  var defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "请选择数据表";
+  defaultOption.selected = true;
+  sheetSelect.appendChild(defaultOption);
+
+  sheetNames.forEach(function(name) {
+    var option = document.createElement("option");
+    option.value = name;
+    option.textContent = "📋 " + sanitizeText(name);
+    sheetSelect.appendChild(option);
+  });
+
+  var sheetSelector = document.getElementById("sheetSelector");
+  if (sheetSelector) {
+    sheetSelector.classList.add("active");
+  }
+
+  if (sheetNames.length === 1) {
+    sheetSelect.value = sheetNames[0];
+    switchSheet();
+  }
+
+  var securityNotice = document.getElementById("securityNotice");
   if (securityNotice) {
     securityNotice.style.display = "none";
   }
@@ -405,9 +531,9 @@ function switchSheet() {
     const worksheet = workbook.Sheets[sheetName];
     let jsonData;
 
-    // 检查是否是 CSV 数据
-    if (worksheet.CSV) {
-      // CSV 数据已经在 handleCSVFile 中解析好了
+    // 检查是否是 CSV/JSON 数据
+    if (worksheet.CSV || worksheet.JSON) {
+      // CSV/JSON 数据已经在解析时处理好了
       jsonData = worksheet.data;
     } else {
       // Excel 数据，使用 XLSX 解析
@@ -2318,8 +2444,8 @@ function showSheetPreview() {
     const worksheet = workbook.Sheets[currentSheet];
     let jsonData;
 
-    // 检查是否是 CSV 数据
-    if (worksheet.CSV) {
+    // 检查是否是 CSV/JSON 数据
+    if (worksheet.CSV || worksheet.JSON) {
       jsonData = worksheet.data;
     } else {
       jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
@@ -2594,8 +2720,8 @@ function generateMindmapFromPreview() {
     const worksheet = workbook.Sheets[currentSheet];
     let jsonData;
 
-    // 检查是否是 CSV 数据
-    if (worksheet.CSV) {
+    // 检查是否是 CSV/JSON 数据
+    if (worksheet.CSV || worksheet.JSON) {
       jsonData = worksheet.data;
     } else {
       jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });

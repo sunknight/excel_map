@@ -760,7 +760,7 @@ function parseExcelData(rawData) {
         _i2: fieldMap.i2 >= 0 ? sanitizeText(row[fieldMap.i2]) : null,
         _i3: fieldMap.i3 >= 0 ? sanitizeText(row[fieldMap.i3]) : null,
         _headers: sanitizedHeaders,
-        _rawData: row,
+        _rawData: row.map(function(cell) { return sanitizeText(String(cell)); }),
       };
 
       // 添加所有字段（使用转义后的header作为key）
@@ -1632,7 +1632,7 @@ function showTestCaseDetail(testCase) {
     // 特殊处理优先级字段
     if (key === "优先级") {
       const priorityTag = document.createElement("span");
-      priorityTag.className = value ? `priority-tag priority-${value}` : "";
+      priorityTag.className = value ? `priority-tag priority-${escapeAttr(value)}` : "";
       priorityTag.textContent = displayValue;
       valueDiv.appendChild(priorityTag);
     } else {

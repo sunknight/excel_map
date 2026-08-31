@@ -2163,68 +2163,74 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// 复制画布到剪贴板
-async function copyCanvas() {
-  try {
-    const canvas = document.getElementById("canvas");
-    const svg = document.getElementById("connections");
+// 浏览器canvas尺寸上限（Chrome约为单边16384px、总面积2.68亿像素，超限时toBlob返回null）
+const CANVAS_MAX_SIDE = 16000;
+const CANVAS_MAX_AREA = 2.6e8;
 
-    // 使用html2canvas库将DOM转换为canvas
-    // 如果没有html2canvas，使用原生方法
-    if (typeof html2canvas === "undefined") {
-      // 动态加载html2canvas库
-      await loadScript(
-        "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
-      );
-    }
+// 将完整脑图渲染为canvas（复制/下载共用）
+// 临时展开画布并移到屏幕外，渲染完成后恢复原样式
+async function renderMindmapCanvas() {
+  const canvas = document.getElementById("canvas");
+  const svg = document.getElementById("connections");
 
-    // 计算所有节点的边界范围
-    const bounds = calculateCanvasBounds();
-
-    // 临时调整画布样式以显示完整内容
-    const originalTransform = canvas.style.transform;
-    const originalWidth = canvas.style.width;
-    const originalHeight = canvas.style.height;
-    const originalOverflow = canvas.style.overflow;
-    const originalPosition = canvas.style.position;
-    const originalLeft = canvas.style.left;
-    const originalTop = canvas.style.top;
-
-    // 保存SVG原始样式
-    const originalSvgWidth = svg.style.width;
-    const originalSvgHeight = svg.style.height;
-    const originalSvgViewBox = svg.getAttribute("viewBox");
-
-    // 将画布移到屏幕外，避免样式调整时的视觉跳动
-    canvas.style.position = "absolute";
-    canvas.style.left = "-99999px";
-    canvas.style.top = "-99999px";
-
-    // 设置画布为完整内容大小
-    canvas.style.transform = "none";
-    canvas.style.width = `${bounds.width + 100}px`;
-    canvas.style.height = `${bounds.height + 100}px`;
-    canvas.style.overflow = "visible";
-
-    // 设置SVG的宽高和viewBox以匹配画布大小
-    svg.style.width = `${bounds.width + 100}px`;
-    svg.style.height = `${bounds.height + 100}px`;
-    svg.setAttribute(
-      "viewBox",
-      `0 0 ${bounds.width + 100} ${bounds.height + 100}`,
+  // 使用html2canvas库将DOM转换为canvas
+  if (typeof html2canvas === "undefined") {
+    // 动态加载html2canvas库
+    await loadScript(
+      "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
     );
+  }
 
-    // 等待DOM更新
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  // 计算所有节点的边界范围
+  const bounds = calculateCanvasBounds();
+  const contentWidth = bounds.width + 100;
+  const contentHeight = bounds.height + 100;
 
+  // 根据画布实际大小自适应清晰度：默认2倍，超出浏览器canvas上限时自动降低
+  let scale = 2;
+  scale = Math.min(scale, CANVAS_MAX_SIDE / Math.max(contentWidth, contentHeight));
+  scale = Math.min(scale, Math.sqrt(CANVAS_MAX_AREA / (contentWidth * contentHeight)));
+  scale = Math.max(0.05, scale);
+
+  // 保存原始样式
+  const originalTransform = canvas.style.transform;
+  const originalWidth = canvas.style.width;
+  const originalHeight = canvas.style.height;
+  const originalOverflow = canvas.style.overflow;
+  const originalPosition = canvas.style.position;
+  const originalLeft = canvas.style.left;
+  const originalTop = canvas.style.top;
+  const originalSvgWidth = svg.style.width;
+  const originalSvgHeight = svg.style.height;
+  const originalSvgViewBox = svg.getAttribute("viewBox");
+
+  // 将画布移到屏幕外并设置为完整内容大小，避免样式调整时的视觉跳动
+  canvas.style.position = "absolute";
+  canvas.style.left = "-99999px";
+  canvas.style.top = "-99999px";
+  canvas.style.transform = "none";
+  canvas.style.width = `${contentWidth}px`;
+  canvas.style.height = `${contentHeight}px`;
+  canvas.style.overflow = "visible";
+
+  // 设置SVG的宽高和viewBox以匹配画布大小
+  svg.style.width = `${contentWidth}px`;
+  svg.style.height = `${contentHeight}px`;
+  svg.setAttribute("viewBox", `0 0 ${contentWidth} ${contentHeight}`);
+
+  // 等待DOM更新
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  let canvasElement;
+  try {
     // 使用html2canvas生成图片
-    const canvasElement = await html2canvas(canvas, {
+    canvasElement = await html2canvas(canvas, {
       backgroundColor: "#f5f7fa",
-      scale: 2, // 提高清晰度
+      scale: scale,
       useCORS: true,
       logging: false,
-      width: bounds.width + 100,
-      height: bounds.height + 100,
+      width: contentWidth,
+      height: contentHeight,
       x: 0,
       y: 0,
       scrollX: 0,
@@ -2232,8 +2238,8 @@ async function copyCanvas() {
       allowTaint: true,
       foreignObjectRendering: false,
     });
-
-    // 恢复画布样式
+  } finally {
+    // 无论成功与否都恢复画布样式
     canvas.style.transform = originalTransform;
     canvas.style.width = originalWidth;
     canvas.style.height = originalHeight;
@@ -2250,130 +2256,63 @@ async function copyCanvas() {
     } else {
       svg.removeAttribute("viewBox");
     }
+  }
 
-    // 转换为blob
-    canvasElement.toBlob(async (blob) => {
-      try {
-        // 复制到剪贴板
-        await navigator.clipboard.write([
-          new ClipboardItem({ "image/png": blob }),
-        ]);
-        showToast("画布已复制到剪贴板", "success");
-      } catch (err) {
-        console.error("复制失败:", err);
-        showToast("复制失败，请使用下载功能", "error");
-      }
-    }, "image/png");
+  return canvasElement;
+}
+
+// canvas转PNG blob（超限等失败场景返回null）
+function canvasToBlob(canvasElement) {
+  return new Promise((resolve) =>
+    canvasElement.toBlob(resolve, "image/png"),
+  );
+}
+
+// 复制画布到剪贴板
+async function copyCanvas() {
+  try {
+    const canvasElement = await renderMindmapCanvas();
+    const blob = await canvasToBlob(canvasElement);
+    if (!blob) {
+      showToast("画布过大，生成图片失败，请折叠部分节点后重试", "error");
+      return;
+    }
+
+    // 复制到剪贴板
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": blob }),
+    ]);
+    showToast("画布已复制到剪贴板", "success");
   } catch (error) {
     console.error("复制画布失败:", error);
-    alert("复制失败: " + error.message);
+    showToast("复制失败，请使用下载功能", "error");
   }
 }
 
 // 下载画布为PNG图片
 async function downloadPNG() {
   try {
-    const canvas = document.getElementById("canvas");
-    const svg = document.getElementById("connections");
-
-    // 使用html2canvas库将DOM转换为canvas
-    if (typeof html2canvas === "undefined") {
-      // 动态加载html2canvas库
-      await loadScript(
-        "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
-      );
+    const canvasElement = await renderMindmapCanvas();
+    const blob = await canvasToBlob(canvasElement);
+    if (!blob) {
+      showToast("画布过大，生成图片失败，请折叠部分节点后重试", "error");
+      return;
     }
 
-    // 计算所有节点的边界范围
-    const bounds = calculateCanvasBounds();
-
-    // 临时调整画布样式以显示完整内容
-    const originalTransform = canvas.style.transform;
-    const originalWidth = canvas.style.width;
-    const originalHeight = canvas.style.height;
-    const originalOverflow = canvas.style.overflow;
-    const originalPosition = canvas.style.position;
-    const originalLeft = canvas.style.left;
-    const originalTop = canvas.style.top;
-
-    // 保存SVG原始样式
-    const originalSvgWidth = svg.style.width;
-    const originalSvgHeight = svg.style.height;
-    const originalSvgViewBox = svg.getAttribute("viewBox");
-
-    // 将画布移到屏幕外，避免样式调整时的视觉跳动
-    canvas.style.position = "absolute";
-    canvas.style.left = "-99999px";
-    canvas.style.top = "-99999px";
-
-    // 设置画布为完整内容大小
-    canvas.style.transform = "none";
-    canvas.style.width = `${bounds.width + 100}px`;
-    canvas.style.height = `${bounds.height + 100}px`;
-    canvas.style.overflow = "visible";
-
-    // 设置SVG的宽高和viewBox以匹配画布大小
-    svg.style.width = `${bounds.width + 100}px`;
-    svg.style.height = `${bounds.height + 100}px`;
-    svg.setAttribute(
-      "viewBox",
-      `0 0 ${bounds.width + 100} ${bounds.height + 100}`,
-    );
-
-    // 等待DOM更新
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // 使用html2canvas生成图片
-    const canvasElement = await html2canvas(canvas, {
-      backgroundColor: "#f5f7fa",
-      scale: 2, // 提高清晰度
-      useCORS: true,
-      logging: false,
-      width: bounds.width + 100,
-      height: bounds.height + 100,
-      x: 0,
-      y: 0,
-      scrollX: 0,
-      scrollY: 0,
-      allowTaint: true,
-      foreignObjectRendering: false,
-    });
-
-    // 恢复画布样式
-    canvas.style.transform = originalTransform;
-    canvas.style.width = originalWidth;
-    canvas.style.height = originalHeight;
-    canvas.style.overflow = originalOverflow;
-    canvas.style.position = originalPosition;
-    canvas.style.left = originalLeft;
-    canvas.style.top = originalTop;
-
-    // 恢复SVG样式
-    svg.style.width = originalSvgWidth;
-    svg.style.height = originalSvgHeight;
-    if (originalSvgViewBox) {
-      svg.setAttribute("viewBox", originalSvgViewBox);
-    } else {
-      svg.removeAttribute("viewBox");
-    }
-
-    // 转换为图片并下载
-    canvasElement.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const timestamp = new Date()
-        .toLocaleDateString("zh-CN")
-        .replace(/\//g, "-");
-      a.download = `Excel脑图_${sanitizeText(timestamp)}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, "image/png");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const timestamp = new Date()
+      .toLocaleDateString("zh-CN")
+      .replace(/\//g, "-");
+    a.download = `Excel脑图_${sanitizeText(timestamp)}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   } catch (error) {
     console.error("下载PNG失败:", error);
-    alert("下载失败: " + error.message);
+    showToast("下载失败: " + error.message, "error");
   }
 }
 
